@@ -33,6 +33,5 @@ def calculate_hand_joints(left_hand_mat, right_hand_mat):
     right_joints_scaled[0] -= np.pi
     # rescale angles to take up full range
     right_joints_scaled[:5]*=2
-    print(right_joints_scaled)
 
     return np.zeros(6), right_joints_scaled

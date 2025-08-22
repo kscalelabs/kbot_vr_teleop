@@ -29,6 +29,9 @@ class VRTeleopApp:
         self.wrist_index = 0
         self.udp_handler = UDPHandler(UDP_HOST, UDP_PORT)
 
+        self.left_arm_joints = np.zeros(5)
+        self.right_arm_joints = np.zeros(5)
+
         @self.app.add_handler("CAMERA_MOVE")
         async def on_cam_move(event, session):
             head_matrix_shared = np.array(event.value["camera"]["matrix"], dtype=np.float32).reshape(4, 4)
@@ -48,9 +51,8 @@ class VRTeleopApp:
                     right_mat_raw = event.value['right']
                     right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                     self.right_hand_poses[:] = (vuer_to_urdf_frame @ right_mat_numpy.T).T# Use the first matrix as the hand pose
-            left_arm_joints, right_arm_joints = calculate_arm_joints(self.head_matrix, self.left_hand_poses[0], self.right_hand_poses[0])
             left_finger_joints, right_finger_joints = calculate_hand_joints(self.left_hand_poses, self.right_hand_poses)
-            self.udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
+            self.udp_handler._send_udp(self.right_arm_joints, self.left_arm_joints, right_finger_joints, left_finger_joints)
 
         @self.app.spawn(start=True)
         async def main(session: VuerSession):
@@ -68,8 +70,9 @@ class VRTeleopApp:
             while True:
                 # right_arm_joints, left_arm_joints = calculate_arm_joints(self.head_matrix, self.left_hand_poses[0], self.right_hand_poses[0])
                 # right_finger_joints, left_finger_joints = calculate_hand_joints(self.left_hand_poses, self.right_hand_poses)
+                self.left_arm_joints, self.right_arm_joints = calculate_arm_joints(self.head_matrix, self.left_hand_poses[0], self.right_hand_poses[0])
                 # self.udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
-                await asyncio.sleep(1)
+                await asyncio.sleep(1/20)
 
 if __name__ == "__main__":
     app = VRTeleopApp()
