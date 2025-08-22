@@ -62,7 +62,7 @@ class VRTeleopApp:
                     right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                     self.right_wrist_pose = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
                     self.right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T # Make the wrist the origin
-            print(self.right_finger_poses[8,:3, 0], self.right_finger_poses[8,:3, 3])
+            # print(self.right_finger_poses[8,:3, 0], self.right_finger_poses[8,:3, 3])
 
         @self.app.spawn(start=True)
         async def main(session: VuerSession):
