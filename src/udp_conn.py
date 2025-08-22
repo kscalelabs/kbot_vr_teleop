@@ -48,8 +48,6 @@ class UDPHandler:
         # [5]: thumb extra joint
         left_arm_angles =  np.zeros(5)
         right_arm_angles = np.zeros(5)
-        print("Arms")
-        print(left_arm_angles, right_arm_angles)
         payload = {
             "timestamp": time.time(),
             "joints": {
@@ -66,11 +64,9 @@ class UDPHandler:
             },
             # thumb: -0.2, 1
             # other fingers: -2.3, 1
-            "fingers": np.clip(np.round((right_finger_angles) * (65535 / 2*np.pi)), 0, 65535).astype(int).tolist()
+            "fingers": np.clip(right_finger_angles * (65535 / (2*np.pi)), 0, 65535).astype(int).tolist()
         }
-        print("Fingers")
-        print(right_finger_angles)
-        print(payload['fingers'])
+        print(payload)
         try:
             self._udp_sock.sendto(json.dumps(payload).encode("utf-8"), (self.udp_host, self.udp_port))
         except Exception:
