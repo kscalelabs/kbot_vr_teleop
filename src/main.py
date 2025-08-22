@@ -5,13 +5,17 @@ from pathlib import Path
 import numpy as np
 from .camera_stream import stream_cameras
 from .arm_inverse_kinematics import calculate_arm_joints
+from .hand_inverse_kinematics import calculate_hand_joints
 from .udp_conn import UDPHandler
 from scipy.spatial.transform import Rotation
 
 
 vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
-vuer_to_urdf_frame[:3,:3] = Rotation.from_euler('xz', (90, 90), degrees=True).as_matrix()
-
+vuer_to_urdf_frame[:3,:3] = np.array([
+    [0, 0, 1],
+    [1, 0, 0],
+    [0, 1, 0]
+], dtype=np.float32)
 UDP_HOST = "127.0.0.1"  # change if needed
 UDP_PORT = 8888
 
@@ -44,7 +48,7 @@ class VRTeleopApp:
                     right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4)
                     self.right_hand_poses[:] = right_mat_numpy[0].T @ vuer_to_urdf_frame # Use the first matrix as the hand pose
             right_arm_joints, left_arm_joints = calculate_arm_joints(self.left_hand_poses[0], self.right_hand_poses[0])
-            right_finger_joints, left_finger_joints = calculate_arm_joints(self.left_hand_poses, self.right_hand_poses)
+            right_finger_joints, left_finger_joints = calculate_hand_joints(self.left_hand_poses, self.right_hand_poses)
             self.udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
 
         @self.app.spawn(start=True)
@@ -55,8 +59,6 @@ class VRTeleopApp:
                     key="hands",
                     hideLeft=False,       # hides the hand, but still streams the data.
                     hideRight=False,      # hides the hand, but still streams the data.
-                    # disableLeft=False,    # disables the left data stream, also hides the hand.
-                    # disableRight=False,   # disables the right data stream, also hides the hand.
                 ),
                 to="bgChildren",
             )
