@@ -56,7 +56,7 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
 
     print(right_joint_angles)
     actual_hand_pose = right_chain.forward_kinematics(right_joint_angles)
-    # print(actual_hand_pose[:3,3])
+    print(right_wrist_mat[:3,3], actual_hand_pose[:3,3])
 
     # print("-"*10)
     # print(Rotation.from_matrix(head_mat[:3,:3]).apply(np.eye(3)[0]))

@@ -46,8 +46,6 @@ class UDPHandler:
         # [3]: Ring finger
         # [4]: Pinky
         # [5]: thumb extra joint
-        left_arm_angles =  np.zeros(5)
-        right_arm_angles = np.zeros(5)
         payload = {
             "timestamp": time.time(),
             "joints": {
