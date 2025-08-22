@@ -62,7 +62,7 @@ class UDPHandler:
             },
             # thumb: -0.2, 1
             # other fingers: -2.3, 1
-            "fingers": (np.clip(right_finger_angles * 65535, 0, 65535).astype(int)).tolist()
+            "fingers": (np.clip(65535-right_finger_angles * 65535, 0, 65535).astype(int)).tolist()
         }
         print(payload)
         try:

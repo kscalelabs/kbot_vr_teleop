@@ -6,17 +6,22 @@ from util import fast_mat_inv
 import ikpy.chain
 from yourdfpy import URDF
 from pathlib import Path
+from visualizer import ThreadedRobotVisualizer
 
 file_absolute_parent = Path(__file__).parent.absolute()
 
-hand_robot  = URDF.load(
+hand_robot = URDF.load(
         f"{file_absolute_parent}/assets/inspire_hand/inspire_hand_right.urdf",
         build_scene_graph=True,      # Enable forward kinematics
         build_collision_scene_graph=False,  # Optional: for collision checking
-        load_collision_meshes=False
+        load_collision_meshes=False,
+        load_meshes=True
     )
 
 last_optim_res =  np.array([*np.zeros(6), 1])
+
+visualizer = ThreadedRobotVisualizer(hand_robot)
+visualizer.start_viewer()
 
 def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
     global last_optim_res
@@ -58,6 +63,15 @@ def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
 
     optim_res = scipy.optimize.least_squares(residuals, last_optim_res, bounds=(tuple(lower_bounds)+(0.1,), tuple(upper_bounds)+(2,)))
     last_optim_res = optim_res.x
+
+    visualizer.update_config({
+        "R_thumb_proximal_pitch_joint": last_optim_res[0],
+        "R_thumb_proximal_yaw_joint": last_optim_res[1],
+        "R_index_proximal_joint": last_optim_res[2],
+        "R_middle_proximal_joint": last_optim_res[3],
+        "R_ring_proximal_joint": last_optim_res[4],
+        "R_pinky_proximal_joint": last_optim_res[5],
+    })
     # print(np.linalg.norm(residuals(optim_res.x)))
     scaled_to_bounds = np.array([
         (x-lb) / (ub-lb) for x, lb, ub in zip(optim_res.x, lower_bounds, upper_bounds)
