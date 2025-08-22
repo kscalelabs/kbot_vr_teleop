@@ -1,17 +1,25 @@
 import numpy as np
-import ikpy.chain
 from scipy.optimize import least_squares
+from yourdfpy import URDF
+
 class IKSolver:
-    def __init__(self, kinematic_chain: ikpy.chain.Chain):
-        self.kinematic_chain = kinematic_chain
-        self.last_guess = np.zeros(6)
+    def __init__(self, robot: URDF):
+        self.robot = robot
+        self.last_guess = np.zeros(len(robot.actuated_joints))
+        self.lower_bounds = []
+        self.upper_bounds = []
+        for joint in self.robot.actuated_joints:
+            self.lower_bounds.append(joint.limit.lower)
+            self.upper_bounds.append(joint.limit.upper)
 
-    def from_scratch_ik(self, target_position): # This shouldn't be necessary but ikpy's inverse kinematics is ironically crap
+    def from_scratch_ik(self, target_position, frame_name): # This shouldn't be necessary but ikpy's inverse kinematics is ironically crap
         def residuals(joint_angles):
-            frame_mat = self.kinematic_chain.forward_kinematics(joint_angles)
-            return frame_mat[:3, 3] - target_position
+            self.robot.update_cfg({
+                k.name: joint_angles[i] for i, k in enumerate(self.robot.actuated_joints)
+            })
+            ee_position = self.robot.get_transform(frame_name, "base")
+            return ee_position[:3, 3] - target_position
 
-        result = least_squares(residuals, self.last_guess)
+        result = least_squares(residuals, self.last_guess, bounds=(self.lower_bounds, self.upper_bounds))
         self.last_guess = result.x
         return self.last_guess
-
