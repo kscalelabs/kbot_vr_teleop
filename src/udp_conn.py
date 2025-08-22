@@ -49,22 +49,22 @@ class UDPHandler:
         payload = {
             "timestamp": time.time(),
             "joints": {
-                "11": -left_arm_angles[0],
-                "12": left_arm_angles[1],
+                "11": -left_arm_angles[4],
+                "12": left_arm_angles[3],
                 "13": left_arm_angles[2],
-                "14": left_arm_angles[3],
-                "15": left_arm_angles[4],
-                "21": right_arm_angles[0],
-                "22": right_arm_angles[1],
+                "14": left_arm_angles[1],
+                "15": left_arm_angles[0],
+                "21": right_arm_angles[4],
+                "22": right_arm_angles[3],
                 "23": right_arm_angles[2],
-                "24": right_arm_angles[3],
-                "25": right_arm_angles[4]
+                "24": right_arm_angles[1],
+                "25": right_arm_angles[0]
             },
             # thumb: -0.2, 1
             # other fingers: -2.3, 1
-            "fingers": np.clip(right_finger_angles * (65535 / (2*np.pi)), 0, 65535).astype(int).tolist()
+            "fingers": (65535 - np.clip(right_finger_angles * (65535 / (2*np.pi)), 0, 65535).astype(int)).tolist()
         }
-        print(payload)
+        # print(payload)
         try:
             self._udp_sock.sendto(json.dumps(payload).encode("utf-8"), (self.udp_host, self.udp_port))
         except Exception:
