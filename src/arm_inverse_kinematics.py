@@ -5,22 +5,32 @@ from ik_helpers import IKSolver
 from pathlib import Path
 from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
+from yourdfpy import URDF
+from visualizer import ThreadedRobotVisualizer
 
 file_absolute_parent = Path(__file__).parent.absolute()
 
 right_chain = ikpy.chain.Chain.from_urdf_file(
     f"{file_absolute_parent}/assets/kbot/robot.urdf",
-    base_elements=['dof_right_shoulder_pitch_03'],  # Start from the torso and let ikpy auto-discover
-    base_element_type='joint'
+    base_elements=['base'],  # Start from the torso and let ikpy auto-discover
+    # base_element_type='joint'
 )
 
-def from_scratch_ik(target_position, kinematic_chain: ikpy.chain.Chain, initial_guess):
-    def residuals(joint_angles):
-        frame_mat = kinematic_chain.forward_kinematics(joint_angles)
-        return (frame_mat[:3, 3] - target_position).tolist()
+def make_robot():
+    return URDF.load(
+            f"{file_absolute_parent}/assets/kbot/robot.urdf",
+            build_scene_graph=True,      # Enable forward kinematics
+            build_collision_scene_graph=False,  # Optional: for collision checking
+            load_collision_meshes=False,
+            load_meshes=True
+        )
+    
+arms_robot = make_robot()
 
-    result = least_squares(residuals, initial_guess)
-    return result.x
+visualizer = ThreadedRobotVisualizer(make_robot)
+visualizer.start_viewer()
+visualizer.add_marker('goal', [0.,0.,0.])
+
 
 # left_chain = ikpy.chain.Chain.from_urdf_file(
 #     f"{file_absolute_parent}/assets/kbot/robot.urdf",
@@ -28,26 +38,19 @@ def from_scratch_ik(target_position, kinematic_chain: ikpy.chain.Chain, initial_
 #     base_element_type='joint'
 # )
 
-solver = IKSolver(right_chain)
+solver = IKSolver(arms_robot)
 
 def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
-    left_wrist_relative_to_head = left_wrist_mat @ fast_mat_inv(head_mat)
-    right_wrist_relative_to_head = right_wrist_mat @ fast_mat_inv(head_mat)
     right_wrist_mat[:3, 3] += np.array([0,0,-1.5]) # move down to roughly match urdf coordinate system
-    # print(right_wrist_mat[:3,3])
+    visualizer.update_marker('goal', right_wrist_mat[:3, 3], right_wrist_mat[:3, :3])
 
-    right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3])
-    # print(right_joint_angles.tolist())
+    right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3], frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop')
+    # right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3])
+    new_config = {
+        link.name: angle for link, angle in zip(right_chain.links[1:], right_joint_angles)
+    }
+    arms_robot.update_cfg(new_config)
+    visualizer.update_config(new_config)
+    print(right_wrist_mat[:3, 3], arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3])
 
-    # right_joint_angles = np.zeros(6)
-
-    # print(right_joint_angles)
-    actual_hand_pose = right_chain.forward_kinematics(right_joint_angles)
-    # print(right_wrist_mat[:3,3], actual_hand_pose[:3,3])
-
-    # print("-"*10)
-    # print(Rotation.from_matrix(head_mat[:3,:3]).apply(np.eye(3)[0]))
-    # print(right_wrist_relative_to_head[:3,3])
-
-
-    return np.zeros(5), right_joint_angles[:5]
+    return np.zeros(5), right_joint_angles

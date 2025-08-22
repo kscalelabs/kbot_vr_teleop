@@ -20,6 +20,9 @@ class IKSolver:
             ee_position = self.robot.get_transform(frame_name, "base")
             return ee_position[:3, 3] - target_position
 
-        result = least_squares(residuals, self.last_guess, bounds=(self.lower_bounds, self.upper_bounds))
+        SOLVE_WITH_BOUNDS = False
+        result = least_squares(residuals, self.last_guess, bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf))
         self.last_guess = result.x
+        if not SOLVE_WITH_BOUNDS:
+            self.last_guess = np.clip(self.last_guess, self.lower_bounds, self.upper_bounds)
         return self.last_guess
