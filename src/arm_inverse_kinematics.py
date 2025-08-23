@@ -27,7 +27,7 @@ def make_robot():
     
 arms_robot = make_robot()
 
-VISUALIZE = False
+VISUALIZE = True
 
 if VISUALIZE:
     visualizer = ThreadedRobotVisualizer(make_robot)

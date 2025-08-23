@@ -23,7 +23,7 @@ hand_vuer_to_urdf_frame[:3,:3] = np.array([
     [0, 0, 1],
     [1, 0, 0]
 ], dtype=np.float32)
-UDP_HOST = "127.0.0.1"  # change if needed
+UDP_HOST = "10.33.13.62"  # change if needed
 UDP_PORT = 8888
 
 cam_mat = np.array([[266.61728276,0.,643.83126137],[0.,266.94450686,494.81811813],[0.,0.,1.,]])
@@ -40,67 +40,81 @@ udp_handler = UDPHandler(UDP_HOST, UDP_PORT)
 left_arm_joints = np.zeros(5)
 right_arm_joints = np.zeros(5)
 
+cam_left = None
+cam_right = None
 
-async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
+STREAM = False
+
+def setup_cameras():
+    global cam_left, cam_right
     left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
     right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
     cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
     cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+
+def update_stream(session):
+    ret_left, frame_left = cam_left.read()
+    ret_right, frame_right = cam_right.read()
+    if not ret_left or not ret_right:
+        return False
+    frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
+    # frame_right_rgb = cv2.cvtColor(frame_right, cv2.COLOR_BGR2RGB)
+    frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
+    frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
+    frame_right_rgb = frame_left_rgb.copy()
+    # frame_right_rgb = cv2.undistort(frame_right_rgb, cam_mat, dist_coeffs)
+    # Add text labels for left/right cameras
+    # cv2.putText(frame_left_rgb, "Left Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+    # cv2.putText(frame_right_rgb, "Right Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+    # Send both images as ImageBackground objects for left/right eye
+    interpupilary_dist = 0
+
+    distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1] # TODO: remove this hard-coded 2 multiplier
+    vertical_angle_rad = np.deg2rad(25)  # Example vertical angle, adjust as needed
+    # Calculate positions for left and right screens with vertical displacement
+    # Keep the same distance from user but move down by the vertical angle
+    y_offset = -distance_to_camera * np.sin(vertical_angle_rad)  # Negative for below horizon
+    z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)  # Adjustment to maintain distance
+    session.upsert([
+        ImageBackground(
+            frame_left_rgb,
+            aspect=1.778,
+            height=2,
+            distanceToCamera=distance_to_camera,
+            position=[-interpupilary_dist/2, y_offset, z_offset],
+            layers=1,
+            format="jpeg",
+            quality=1000,
+            key="background-left",
+            interpolate=True,
+        ),
+        ImageBackground(
+            frame_right_rgb,
+            aspect=1.778,
+            height=2,
+            distanceToCamera=distance_to_camera,
+            position=[-interpupilary_dist/2, y_offset, z_offset],
+            layers=2,
+            format="jpeg",
+            quality=1000,
+            key="background-right",
+            interpolate=True,
+        ),
+    ], to="bgChildren")
+
+    return True
+
+
+async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
+    if STREAM:
+        setup_cameras()
     
     while True:
-        ret_left, frame_left = cam_left.read()
-        ret_right, frame_right = cam_right.read()
-        if not ret_left or not ret_right:
-            continue
-        frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
-        # frame_right_rgb = cv2.cvtColor(frame_right, cv2.COLOR_BGR2RGB)
-        frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
-        frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
-        frame_right_rgb = frame_left_rgb.copy()
-        # frame_right_rgb = cv2.undistort(frame_right_rgb, cam_mat, dist_coeffs)
-        # Add text labels for left/right cameras
-        # cv2.putText(frame_left_rgb, "Left Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
-        # cv2.putText(frame_right_rgb, "Right Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
-        # Send both images as ImageBackground objects for left/right eye
-        interpupilary_dist = 0
-
-        distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1] # TODO: remove this hard-coded 2 multiplier
-        vertical_angle_rad = np.deg2rad(25)  # Example vertical angle, adjust as needed
-        # Calculate positions for left and right screens with vertical displacement
-        # Keep the same distance from user but move down by the vertical angle
-        y_offset = -distance_to_camera * np.sin(vertical_angle_rad)  # Negative for below horizon
-        z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)  # Adjustment to maintain distance
-        session.upsert([
-            ImageBackground(
-                frame_left_rgb,
-                aspect=1.778,
-                height=2,
-                distanceToCamera=distance_to_camera,
-                position=[-interpupilary_dist/2, y_offset, z_offset],
-                layers=1,
-                format="jpeg",
-                quality=1000,
-                key="background-left",
-                interpolate=True,
-            ),
-            ImageBackground(
-                frame_right_rgb,
-                aspect=1.778,
-                height=2,
-                distanceToCamera=distance_to_camera,
-                position=[-interpupilary_dist/2, y_offset, z_offset],
-                layers=2,
-                format="jpeg",
-                quality=1000,
-                key="background-right",
-                interpolate=True,
-            ),
-        ], to="bgChildren")
-
+        if STREAM:
+            update_stream(session)
         left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, left_wrist_pose, right_wrist_pose)
         left_finger_joints, right_finger_joints = calculate_hand_joints(left_finger_poses, right_finger_poses)
         udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
-        await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
 
 if __name__ == "__main__":
     app = Vuer()
@@ -112,6 +126,7 @@ if __name__ == "__main__":
 
     @app.add_handler("HAND_MOVE")
     async def hand_move_handler(event, session):
+        global left_wrist_pose, right_wrist_pose, left_finger_poses, right_finger_poses
         """Handle hand tracking data and print information"""
         if event.key == 'hands':
             if 'leftState' in event.value and event.value['leftState']: # There is also more info in these but we ignore it
