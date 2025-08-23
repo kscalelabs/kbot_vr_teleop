@@ -46,8 +46,8 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
 
     right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3], frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop')
     # right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3])
-    new_config = {
-        link.name: angle for link, angle in zip(right_chain.links[1:], right_joint_angles)
+    new_config={
+        k.name: right_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints)
     }
     arms_robot.update_cfg(new_config)
     visualizer.update_config(new_config)

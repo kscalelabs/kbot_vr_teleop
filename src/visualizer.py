@@ -56,51 +56,28 @@ class ThreadedRobotVisualizer:
 
     def _create_axis_marker(self, length=0.08, radius=0.003):
         """Create a coordinate axis marker (X=red, Y=green, Z=blue)"""
-        geometries = []
-        
         # X-axis (red)
         x_cylinder = trimesh.creation.cylinder(radius=radius, height=length, sections=8)
         x_cylinder.apply_transform(
-            trimesh.transformations.rotation_matrix(np.pi/2, [0, 1, 0]) @
-            trimesh.transformations.translation_matrix([length, 0, 0])
+            trimesh.transformations.rotation_matrix(np.pi/2, [0, 1, 0])
+            # trimesh.transformations.translation_matrix([length, 0, 0])
         )
         x_cylinder.visual.face_colors = [255, 0, 0, 255]
         
         # Y-axis (green)
         y_cylinder = trimesh.creation.cylinder(radius=radius, height=length, sections=8)
         y_cylinder.apply_transform(
-            trimesh.transformations.rotation_matrix(-np.pi/2, [1, 0, 0]) @
-            trimesh.transformations.translation_matrix([0, length, 0])
+            trimesh.transformations.rotation_matrix(-np.pi/2, [1, 0, 0])
+            # trimesh.transformations.translation_matrix([0, length, 0])
         )
         y_cylinder.visual.face_colors = [0, 255, 0, 255]
         
         # Z-axis (blue)
         z_cylinder = trimesh.creation.cylinder(radius=radius, height=length, sections=8)
-        z_cylinder.apply_transform(trimesh.transformations.translation_matrix([0, 0, length]))
+        # z_cylinder.apply_transform(trimesh.transformations.translation_matrix([0, 0, length]))
         z_cylinder.visual.face_colors = [0, 0, 255, 255]
         
-        # Arrow heads
-        arrow_head_size = radius * 3
-        
-        x_cone = trimesh.creation.cone(radius=arrow_head_size, height=arrow_head_size * 2, sections=8)
-        x_cone.apply_transform(
-            trimesh.transformations.rotation_matrix(np.pi/2, [0, 1, 0]) @
-            trimesh.transformations.translation_matrix([length, 0, 0])
-        )
-        x_cone.visual.face_colors = [255, 0, 0, 255]
-        
-        y_cone = trimesh.creation.cone(radius=arrow_head_size, height=arrow_head_size * 2, sections=8)
-        y_cone.apply_transform(
-            trimesh.transformations.rotation_matrix(-np.pi/2, [1, 0, 0]) @
-            trimesh.transformations.translation_matrix([0, length, 0])
-        )
-        y_cone.visual.face_colors = [0, 255, 0, 255]
-        
-        z_cone = trimesh.creation.cone(radius=arrow_head_size, height=arrow_head_size * 2, sections=8)
-        z_cone.apply_transform(trimesh.transformations.translation_matrix([0, 0, length/2]))
-        z_cone.visual.face_colors = [0, 0, 255, 255]
-        
-        return [x_cylinder, y_cylinder, z_cylinder, x_cone, y_cone, z_cone]
+        return [x_cylinder, y_cylinder, z_cylinder]
 
     def _get_marker_geom_names(self, marker_name):
         """Get all geometry names for a marker"""
