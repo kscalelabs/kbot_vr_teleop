@@ -24,7 +24,7 @@ hand_vuer_to_urdf_frame[:3,:3] = np.array([
     [0, 0, 1],
     [1, 0, 0]
 ], dtype=np.float32)
-UDP_HOST = "10.33.12.254"  # change if needed
+UDP_HOST = "127.0.0.1"  # change if needed
 UDP_PORT = 8888
 
 class VRTeleopApp:
@@ -76,7 +76,7 @@ class VRTeleopApp:
                 to="bgChildren",
             )
 
-            # await stream_cameras(session)
+            stream_cameras(session)
             while True:
                 # right_arm_joints, left_arm_joints = calculate_arm_joints(self.head_matrix, self.left_hand_poses[0], self.right_hand_poses[0])
                 # right_finger_joints, left_finger_joints = calculate_hand_joints(self.left_hand_poses, self.right_hand_poses)
