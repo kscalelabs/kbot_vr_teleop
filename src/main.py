@@ -134,13 +134,13 @@ if __name__ == "__main__":
             if 'leftState' in event.value and event.value['leftState']: # There is also more info in these but we ignore it
                 left_mat_raw = event.value['left'] # 400-long float array, 25 4x4 matrices
                 left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25, 4, 4)
-                left_wrist_pose = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
+                left_wrist_pose[:] = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
                 left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T # Make the wrist the origin
 
             if 'rightState' in event.value and event.value['rightState']:
                 right_mat_raw = event.value['right']
                 right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
-                right_wrist_pose = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
+                right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
                 right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T # Make the wrist the origin
         # print(right_finger_poses[8,:3, 0], right_finger_poses[8,:3, 3])
     @app.spawn(start=True)
