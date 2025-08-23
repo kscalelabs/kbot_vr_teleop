@@ -53,33 +53,45 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         if not ret_left or not ret_right:
             continue
         frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
-        frame_right_rgb = cv2.cvtColor(frame_right, cv2.COLOR_BGR2RGB)
+        # frame_right_rgb = cv2.cvtColor(frame_right, cv2.COLOR_BGR2RGB)
         frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
-        frame_right_rgb = cv2.undistort(frame_right_rgb, cam_mat, dist_coeffs)
+        frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
+        frame_right_rgb = frame_left_rgb.copy()
+        # frame_right_rgb = cv2.undistort(frame_right_rgb, cam_mat, dist_coeffs)
         # Add text labels for left/right cameras
-        cv2.putText(frame_left_rgb, "Left Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
-        cv2.putText(frame_right_rgb, "Right Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+        # cv2.putText(frame_left_rgb, "Left Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+        # cv2.putText(frame_right_rgb, "Right Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
         # Send both images as ImageBackground objects for left/right eye
+        interpupilary_dist = 0
+
+        distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1] # TODO: remove this hard-coded 2 multiplier
+        vertical_angle_rad = np.deg2rad(25)  # Example vertical angle, adjust as needed
+        # Calculate positions for left and right screens with vertical displacement
+        # Keep the same distance from user but move down by the vertical angle
+        y_offset = -distance_to_camera * np.sin(vertical_angle_rad)  # Negative for below horizon
+        z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)  # Adjustment to maintain distance
         session.upsert([
             ImageBackground(
                 frame_left_rgb,
                 aspect=1.778,
-                height=1,
-                distanceToCamera=1,
+                height=2,
+                distanceToCamera=distance_to_camera,
+                position=[-interpupilary_dist/2, y_offset, z_offset],
                 layers=1,
                 format="jpeg",
-                quality=50,
+                quality=1000,
                 key="background-left",
                 interpolate=True,
             ),
             ImageBackground(
                 frame_right_rgb,
                 aspect=1.778,
-                height=1,
-                distanceToCamera=1,
+                height=2,
+                distanceToCamera=distance_to_camera,
+                position=[-interpupilary_dist/2, y_offset, z_offset],
                 layers=2,
                 format="jpeg",
-                quality=50,
+                quality=1000,
                 key="background-right",
                 interpolate=True,
             ),
