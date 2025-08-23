@@ -65,15 +65,15 @@ def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
         ]) - scale_factor * right_fingers_mat[tip_indices, :3, 3]).flatten()
     jac_sparsity_mat = np.zeros((len(tip_indices), 7))
     jac_sparsity_mat[0, 0] = 1
-    jac_sparsity_mat[0, 5] = 1
+    jac_sparsity_mat[0, 1] = 1
     jac_sparsity_mat[0, 6] = 1
-    jac_sparsity_mat[1, 1] = 1
+    jac_sparsity_mat[1, 2] = 1
     jac_sparsity_mat[1, 6] = 1
-    jac_sparsity_mat[2, 2] = 1
+    jac_sparsity_mat[2, 3] = 1
     jac_sparsity_mat[2, 6] = 1
-    jac_sparsity_mat[3, 3] = 1
+    jac_sparsity_mat[3, 4] = 1
     jac_sparsity_mat[3, 6] = 1
-    jac_sparsity_mat[4, 4] = 1
+    jac_sparsity_mat[4, 5] = 1
     jac_sparsity_mat[4, 6] = 1
 
     optim_res = scipy.optimize.least_squares(residuals, last_optim_res, bounds=(tuple(lower_bounds)+(0.1,), tuple(upper_bounds)+(2,)), jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0))
