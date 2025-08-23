@@ -3,7 +3,7 @@ import asyncio
 from vuer.schemas import ImageBackground, Hands
 from pathlib import Path
 import numpy as np
-from camera_stream import stream_cameras
+from camera_stream import CameraStreamer
 from arm_inverse_kinematics import calculate_arm_joints
 from hand_inverse_kinematics import calculate_hand_joints
 from udp_conn import UDPHandler
@@ -40,6 +40,7 @@ class VRTeleopApp:
 
         self.left_arm_joints = np.zeros(5)
         self.right_arm_joints = np.zeros(5)
+        self.streamer = CameraStreamer(self.app.session)
 
         @self.app.add_handler("CAMERA_MOVE")
         async def on_cam_move(event, session):
@@ -76,14 +77,13 @@ class VRTeleopApp:
                 to="bgChildren",
             )
 
-            stream_cameras(session)
             while True:
                 # right_arm_joints, left_arm_joints = calculate_arm_joints(self.head_matrix, self.left_hand_poses[0], self.right_hand_poses[0])
                 # right_finger_joints, left_finger_joints = calculate_hand_joints(self.left_hand_poses, self.right_hand_poses)
                 left_arm_joints, right_arm_joints = calculate_arm_joints(self.head_matrix, self.left_wrist_pose, self.right_wrist_pose)
                 left_finger_joints, right_finger_joints = calculate_hand_joints(self.left_finger_poses, self.right_finger_poses)
                 self.udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
-                await asyncio.sleep(1/20)
+                self.streamer.update_stream()
 
 if __name__ == "__main__":
     app = VRTeleopApp()
