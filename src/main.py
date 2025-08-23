@@ -40,7 +40,7 @@ class VRTeleopApp:
 
         self.left_arm_joints = np.zeros(5)
         self.right_arm_joints = np.zeros(5)
-        self.streamer = CameraStreamer(self.app.session)
+        self.streamer = CameraStreamer()
 
         @self.app.add_handler("CAMERA_MOVE")
         async def on_cam_move(event, session):
@@ -83,7 +83,7 @@ class VRTeleopApp:
                 left_arm_joints, right_arm_joints = calculate_arm_joints(self.head_matrix, self.left_wrist_pose, self.right_wrist_pose)
                 left_finger_joints, right_finger_joints = calculate_hand_joints(self.left_finger_poses, self.right_finger_poses)
                 self.udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
-                self.streamer.update_stream()
+                self.streamer.update_stream(session)
 
 if __name__ == "__main__":
     app = VRTeleopApp()

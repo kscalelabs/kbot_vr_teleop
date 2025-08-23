@@ -7,8 +7,7 @@ import cv2
 
 
 class CameraStreamer:
-    def __init__(self, session: VuerSession):
-        self.session = session
+    def __init__(self):
         left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
         right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
         self.cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
@@ -16,7 +15,7 @@ class CameraStreamer:
         self.cam_mat = np.array([[266.61728276,0.,643.83126137],[0.,266.94450686,494.81811813],[0.,0.,1.,]])
         self.dist_coeffs = np.array([[-6.07417419e-02,9.95447444e-02,-2.26448001e-04,1.22881804e-03,3.42134205e-03,1.45361886e-01,8.03248099e-02,2.11170107e-02,-3.80620047e-03,2.48350591e-05,-8.33565666e-04,2.97806723e-05]])
 
-    def update_stream(self):
+    def update_stream(self, session):
         ret_left, frame_left = self.cam_left.read()
         ret_right, frame_right = self.cam_right.read()
         if not ret_left or not ret_right:
@@ -39,7 +38,7 @@ class CameraStreamer:
         # Keep the same distance from user but move down by the vertical angle
         y_offset = -distance_to_camera * np.sin(vertical_angle_rad)  # Negative for below horizon
         z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)  # Adjustment to maintain distance
-        self.session.upsert([
+        session.upsert([
             ImageBackground(
                 frame_left_rgb,
                 aspect=1.778,

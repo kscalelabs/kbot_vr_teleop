@@ -64,7 +64,7 @@ class UDPHandler:
             # other fingers: -2.3, 1
             "fingers": (np.clip(65535-right_finger_angles * 65535, 0, 65535).astype(int)).tolist()
         }
-        # print(payload)
+        print(payload)
         try:
             self._udp_sock.sendto(json.dumps(payload).encode("utf-8"), (self.udp_host, self.udp_port))
         except Exception:
