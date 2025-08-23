@@ -27,7 +27,7 @@ def make_robot():
     
 arms_robot = make_robot()
 
-VISUALIZE = True
+VISUALIZE = False
 
 if VISUALIZE:
     visualizer = ThreadedRobotVisualizer(make_robot)
@@ -55,6 +55,6 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     if VISUALIZE:
         visualizer.update_marker('goal', right_wrist_mat[:3, 3], right_wrist_mat[:3, :3])
         visualizer.update_config(new_config)
-    #print(right_wrist_mat[:3, 3], arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3])
+    print(right_wrist_mat[:3, 3], arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3])
 
     return np.zeros(5), right_joint_angles

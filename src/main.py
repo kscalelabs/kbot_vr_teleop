@@ -111,10 +111,12 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     
     while True:
         if STREAM:
-            update_stream(session)
+            if not update_stream(session):
+                continue
         left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, left_wrist_pose, right_wrist_pose)
         left_finger_joints, right_finger_joints = calculate_hand_joints(left_finger_poses, right_finger_poses)
         udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
+        await asyncio.sleep(0.01)  # This sleep is necessary to not block the handlers for cam move and hand move
 
 if __name__ == "__main__":
     app = Vuer()
