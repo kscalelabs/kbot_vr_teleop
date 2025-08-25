@@ -15,6 +15,18 @@ rr.init("scrub_ik_data", spawn=True)
 
 
 raw_data = pd.read_csv(Path(__file__).absolute().parent / "right_wrist_data.csv")
+hull_data = pd.read_csv(Path(__file__).absolute().parent / "kbot_arm_convex_hull.csv")
+rr.log('task_space_hull', rr.Points3D(hull_data.values, colors=[[0,200,200]]*len(hull_data)), static=True)
+# TODO: fit a 4DOF sphere with RANSCAC and display the sphere in rerun
+
+
+human_hull_data = pd.read_csv(Path(__file__).absolute().parent / "human_arm_convex_hull.csv")
+rr.log('human_task_space_hull', rr.Points3D(human_hull_data.values, colors=[[200,0,200]]*len(human_hull_data)), static=True)
+# TODO: fit a sphere with RANSCAC and display the sphere in rerun
+
+
+
+
 # rr.send_columns('wrist_pose', indexes = [rr.TimeSecondsColumn('my_timeline', raw_data['timestamp'].values)], columns = [*rr.Points3D.columns(positions=raw_data[['x', 'y', 'z']].values)])
 
 arms_robot.update_cfg({
