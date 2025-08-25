@@ -27,7 +27,7 @@ def make_robot():
     
 arms_robot = make_robot()
 
-VISUALIZE = False
+VISUALIZE = True
 
 if VISUALIZE:
     visualizer = ThreadedRobotVisualizer(make_robot)
@@ -44,7 +44,8 @@ if VISUALIZE:
 solver = IKSolver(arms_robot)
 
 def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
-    right_wrist_mat[:3, 3] += np.array([0,0,-1.5]) # move down to roughly match urdf coordinate system
+    # right_wrist_mat = right_wrist_mat.copy()
+    # right_wrist_mat[:3, 3] += np.array([0,0,-1.5]) # move down to roughly match urdf coordinate system
 
     right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3], frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop')
     # right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3])
@@ -57,4 +58,18 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
         visualizer.update_config(new_config)
     print(right_wrist_mat[:3, 3], arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3])
 
-    return np.zeros(5), right_joint_angles
+    return np.zeros(5), right_joint_angles[::2]
+
+def new_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
+    # right_wrist_mat[:3, 3] += np.array([0,0,-1.5]) # move down to roughly match urdf coordinate system
+    ik_solution = right_chain.inverse_kinematics(target_position = right_wrist_mat[:3, 3])
+
+    new_config={
+        k.name: ik_solution[1:-1][i//2] for i, k in enumerate(arms_robot.actuated_joints)
+    }
+    arms_robot.update_cfg(new_config)
+    # if VISUALIZE:
+    #     visualizer.update_marker('goal', right_wrist_mat[:3, 3], right_wrist_mat[:3, :3])
+    #     visualizer.update_config(new_config)
+
+    return np.zeros(5), ik_solution[1:-1]  # ikpy includes dummy links on both ends of the kinematic chain
