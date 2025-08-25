@@ -118,7 +118,7 @@ if __name__ == "__main__":
     async def on_cam_move(event, session):
         head_matrix_shared = np.array(event.value["camera"]["matrix"], dtype=np.float32).reshape(4, 4)
         head_matrix[:] = kbot_vuer_to_urdf_frame @ head_matrix_shared.T
-        rr.log('head', rr.Transform3D(translation=head_matrix[:3, 3], mat3x3=head_matrix[:3, :3], axis_length=0.05))
+        rr.log('head', rr.Transform3D(translation=np.zeros(3), mat3x3=head_matrix[:3, :3], axis_length=0.05))
 
     @app.add_handler("HAND_MOVE")
     async def hand_move_handler(event, session):
@@ -129,6 +129,7 @@ if __name__ == "__main__":
                 left_mat_raw = event.value['left'] # 400-long float array, 25 4x4 matrices
                 left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                 left_wrist_pose[:] = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
+                left_wrist_pose[:3, 3] -= head_matrix[:3, 3]  # make head the origin
                 left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T # Make the wrist the origin
                 rr.log('left_wrist', rr.Transform3D(translation=left_wrist_pose[:3, 3], mat3x3=left_wrist_pose[:3, :3], axis_length=0.05))
                 # rr.log('left_fingers', rr.Points3D(left_finger_poses[:,:3,3], colors=[[0,255,0]]*left_finger_poses.shape[0], radii=0.005))
@@ -137,6 +138,7 @@ if __name__ == "__main__":
                 right_mat_raw = event.value['right']
                 right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                 right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
+                right_wrist_pose[:3, 3] -= head_matrix[:3, 3]  # make head the origin
                 right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T # Make the wrist the origin
                 rr.log('right_wrist', rr.Transform3D(translation=right_wrist_pose[:3, 3], mat3x3=right_wrist_pose[:3, :3], axis_length=0.05))
                 # rr.log('right_fingers', rr.Points3D(right_finger_poses[:,:3,3], colors=[[0,0,255]]*right_finger_poses.shape[0], radii=0.005))
