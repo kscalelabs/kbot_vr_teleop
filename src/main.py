@@ -5,10 +5,12 @@ import asyncio
 from vuer.schemas import ImageBackground, Hands
 import numpy as np
 from erics_cameras.libcamera_cam import LibCameraCam
-from arm_inverse_kinematics import calculate_arm_joints
-from hand_inverse_kinematics import calculate_hand_joints
+from arm_inverse_kinematics import new_calculate_arm_joints
+from hand_inverse_kinematics import calculate_hand_joints_no_ik
 from udp_conn import UDPHandler
 from util import fast_mat_inv
+from scipy.spatial.transform import Rotation
+import time
 
 kbot_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
 kbot_vuer_to_urdf_frame[:3,:3] = np.array([
@@ -50,8 +52,8 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
     
     while True:
-        left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, left_wrist_pose, right_wrist_pose)
-        left_finger_joints, right_finger_joints = calculate_hand_joints(left_finger_poses, right_finger_poses)
+        left_arm_joints, right_arm_joints = new_calculate_arm_joints(head_matrix, left_wrist_pose, right_wrist_pose)
+        left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
         udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
         if STREAM:
             ret_left, frame_left = cam_left.read()
@@ -105,6 +107,9 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
 
 
+# create file right_wrist_data.csv
+with open("right_wrist_data.csv", "w") as f:
+    f.write("timestamp,x,y,z,qx,qy,qz,qw\n")
 if __name__ == "__main__":
     app = Vuer()
 
@@ -128,6 +133,10 @@ if __name__ == "__main__":
                 right_mat_raw = event.value['right']
                 right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                 right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
+                # append to right_wrist_data
+                with open("right_wrist_data.csv", "a") as f:
+                    quat = Rotation.from_matrix(right_wrist_pose[:3, :3]).as_quat() # xyzw
+                    f.write(f"{time.time()},{right_wrist_pose[0,3]},{right_wrist_pose[1,3]},{right_wrist_pose[2,3]},{quat[0]},{quat[1]},{quat[2]},{quat[3]}\n")
                 right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T # Make the wrist the origin
         # print(right_finger_poses[8,:3, 0], right_finger_poses[8,:3, 3])
     @app.spawn(start=True)
