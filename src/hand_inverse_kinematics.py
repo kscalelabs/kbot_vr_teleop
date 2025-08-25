@@ -95,3 +95,26 @@ def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
     reordered_correctly = scaled_to_bounds[[0,2,3,4,5,1]]
 
     return np.zeros(6), reordered_correctly
+
+def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
+    left_joints = np.zeros(6)
+
+    # indices are 1 less than what the docs say because we exclude the wrist pose (all of these are relative to the wrist)
+    tip_indices = [3, 8, 13, 18, 23]
+    metacarpal_indices = [0,4,9,14,20]
+
+    tips_relative_to_metacarpals = np.array([
+        fast_mat_inv(right_fingers_mat[i]) @ right_fingers_mat[j] for i, j in zip(metacarpal_indices, tip_indices)
+    ])
+    angles = Rotation.from_matrix(tips_relative_to_metacarpals[:,:3,:3]).as_euler('XYZ', degrees=False)[:,0]
+    # angles is from roughly -0.4 to 2.5, with a singularity where it jumps from -pi to pi. Needs to be transformed to range [0,1] with no singularity.
+    angles = (angles-1.5) % (2*np.pi)
+    # 4.8 to 0.4
+    angles[1:] = (angles[1:] - 0.4) / (4.8 - 0.4)
+    # thumb is from 3.0 to 5.3
+    angles[0] = (angles[0] - 3.0) / (5.3 - 3.0)
+    # angles = (angles + np.pi) / (2 * np.pi)
+    angles_list = angles.tolist()
+    thumb_metacarpal_angles = Rotation.from_matrix(right_fingers_mat[0,:3,:3]).as_euler('XYZ', degrees=False).tolist()[1]
+
+    return left_joints, np.clip(angles_list+[thumb_metacarpal_angles], 0, 1)
