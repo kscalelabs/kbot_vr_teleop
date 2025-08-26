@@ -7,7 +7,6 @@ from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
 from yourdfpy import URDF
 from visualizer import ThreadedRobotVisualizer
-import pybullet
 import numpy as np
 from scipy.optimize import least_squares
 from yourdfpy import URDF

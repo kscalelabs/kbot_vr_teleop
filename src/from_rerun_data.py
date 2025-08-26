@@ -87,8 +87,7 @@ def main():
             timestamp = int(i)
 
         # IK computations
-        _, placo_joints = placo_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
-        _, old_arm_joint_angles = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat, initial_guess=np.deg2rad(placo_joints))
+        _, old_arm_joint_angles = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
         _, arm_joint_angles = new_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
 
         rr.set_time_seconds('my_timeline', timestamp.timestamp())
