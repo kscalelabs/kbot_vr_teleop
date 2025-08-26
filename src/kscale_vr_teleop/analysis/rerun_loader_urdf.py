@@ -162,7 +162,6 @@ def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
             albedo_texture=albedo_texture,
             vertex_texcoords=vertex_texcoords,
         ),
-        timeless=True,
     )
 
 
