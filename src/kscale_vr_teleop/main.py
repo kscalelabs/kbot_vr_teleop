@@ -1,7 +1,21 @@
+import cv2
+from vuer import Vuer, VuerSession
+import asyncio
+from vuer.schemas import ImageBackground, Hands
+import numpy as np
+from erics_cameras.libcamera_cam import LibCameraCam
+from kscale_vr_teleop.arm_inverse_kinematics import calculate_arm_joints, arms_robot, right_arm_links
+from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
+from kscale_vr_teleop.udp_conn import UDPHandler
+from kscale_vr_teleop.util import fast_mat_inv
+from scipy.spatial.transform import Rotation
+import time
 
-from kscale_vr_teleop.main import *
+import rerun as rr
 
-# Re-export for backwards compatibility
+rr.init("vr_teleop", spawn=True)
+
+rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
 kbot_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
 kbot_vuer_to_urdf_frame[:3,:3] = np.array([
     [0, 0, -1],
@@ -34,7 +48,6 @@ right_arm_joints = np.zeros(5)
 
 STREAM = False
 
-# offset between VR headset and urdf base link (?) Kinda ad-hoc estimated and seems to work, didn't think about it too hard.
 base_to_head_transform = np.eye(4)
 base_to_head_transform[:3,3] = np.array([
 	0, 0, 0.25
@@ -62,23 +75,15 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
             if not ret_left or not ret_right:
                 continue
             frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
-            # frame_right_rgb = cv2.cvtColor(frame_right, cv2.COLOR_BGR2RGB)
             frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
             frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
             frame_right_rgb = frame_left_rgb.copy()
-            # frame_right_rgb = cv2.undistort(frame_right_rgb, cam_mat, dist_coeffs)
-            # Add text labels for left/right cameras
-            # cv2.putText(frame_left_rgb, "Left Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
-            # cv2.putText(frame_right_rgb, "Right Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
-            # Send both images as ImageBackground objects for left/right eye
             interpupilary_dist = 0
 
-            distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1] # TODO: remove this hard-coded 2 multiplier
-            vertical_angle_rad = np.deg2rad(25)  # Example vertical angle, adjust as needed
-            # Calculate positions for left and right screens with vertical displacement
-            # Keep the same distance from user but move down by the vertical angle
-            y_offset = -distance_to_camera * np.sin(vertical_angle_rad)  # Negative for below horizon
-            z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)  # Adjustment to maintain distance
+            distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1]
+            vertical_angle_rad = np.deg2rad(25)
+            y_offset = -distance_to_camera * np.sin(vertical_angle_rad)
+            z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)
             session.upsert([
                 ImageBackground(
                     frame_left_rgb,
@@ -120,26 +125,22 @@ if __name__ == "__main__":
     @app.add_handler("HAND_MOVE")
     async def hand_move_handler(event, session):
         global left_wrist_pose, right_wrist_pose, left_finger_poses, right_finger_poses
-        """Handle hand tracking data and print information"""
         if event.key == 'hands':
-            if 'leftState' in event.value and event.value['leftState']: # There is also more info in these but we ignore it
-                left_mat_raw = event.value['left'] # 400-long float array, 25 4x4 matrices
+            if 'leftState' in event.value and event.value['leftState']:
+                left_mat_raw = event.value['left']
                 left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                 left_wrist_pose[:] = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
-                left_wrist_pose[:3, 3] -= head_matrix[:3, 3]  # make head the origin
-                left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T # Make the wrist the origin
+                left_wrist_pose[:3, 3] -= head_matrix[:3, 3]
+                left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
                 rr.log('left_wrist', rr.Transform3D(translation=left_wrist_pose[:3, 3], mat3x3=left_wrist_pose[:3, :3], axis_length=0.05))
-                # rr.log('left_fingers', rr.Points3D(left_finger_poses[:,:3,3], colors=[[0,255,0]]*left_finger_poses.shape[0], radii=0.005))
 
             if 'rightState' in event.value and event.value['rightState']:
                 right_mat_raw = event.value['right']
                 right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
                 right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
-                right_wrist_pose[:3, 3] -= head_matrix[:3, 3]  # make head the origin
-                right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T # Make the wrist the origin
+                right_wrist_pose[:3, 3] -= head_matrix[:3, 3]
+                right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
                 rr.log('right_wrist', rr.Transform3D(translation=right_wrist_pose[:3, 3], mat3x3=right_wrist_pose[:3, :3], axis_length=0.05))
-                # rr.log('right_fingers', rr.Points3D(right_finger_poses[:,:3,3], colors=[[0,0,255]]*right_finger_poses.shape[0], radii=0.005))
-        # print(right_finger_poses[8,:3, 0], right_finger_poses[8,:3, 3])
     @app.spawn(start=True)
     async def main(session: VuerSession):
         session.upsert(

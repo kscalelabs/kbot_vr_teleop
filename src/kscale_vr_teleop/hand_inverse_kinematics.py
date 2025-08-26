@@ -1,11 +1,20 @@
-from kscale_vr_teleop.hand_inverse_kinematics import *
+import numpy as np
+import scipy
+from scipy.spatial.transform import Rotation
 
-# Backwards compatibility shim
+from kscale_vr_teleop.util import fast_mat_inv
+import ikpy.chain
+from yourdfpy import URDF
+from pathlib import Path
+from kscale_vr_teleop.analysis.visualizer import ThreadedRobotVisualizer
+
+from kscale_vr_teleop._assets import ASSETS_DIR
 
 file_absolute_parent = Path(__file__).parent.absolute()
 
-make_hand_robot = lambda: URDF.load(
-        f"{file_absolute_parent}/assets/inspire_hand/inspire_hand_right.urdf",
+def make_hand_robot():
+    return URDF.load(
+        str(ASSETS_DIR / "inspire_hand" / "inspire_hand_right.urdf"),
         build_scene_graph=True,      # Enable forward kinematics
         build_collision_scene_graph=False,  # Optional: for collision checking
         load_collision_meshes=False,
@@ -23,10 +32,6 @@ if VISUALIZE:
 
 def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
     global last_optim_res
-    '''
-    Both mats are 25x4x4 in urdf frame.
-    '''
-    # indices are 1 less than what the docs say because we exclude the wrist pose (all of these are relative to the wrist)
     tip_indices = [3, 8, 13, 18, 23]
 
     lower_bounds = [] 
@@ -34,7 +39,6 @@ def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
     for joint in hand_robot.actuated_joints:
         lower_bounds.append(joint.limit.lower)
         upper_bounds.append(joint.limit.upper)
-    # print(right_fingers_mat[8,:3,0], right_fingers_mat[8,:3, 3])
     def residuals(joint_angles_and_scale):
         hand_robot.update_cfg({
             "R_thumb_proximal_pitch_joint": joint_angles_and_scale[0],
@@ -82,18 +86,13 @@ def calculate_hand_joints(left_fingers_mat, right_fingers_mat):
             "R_ring_proximal_joint": last_optim_res[4],
             "R_pinky_proximal_joint": last_optim_res[5],
         })
-    # print(np.linalg.norm(residuals(optim_res.x)))
-    scaled_to_bounds = np.array([
-        (x-lb) / (ub-lb) for x, lb, ub in zip(optim_res.x, lower_bounds, upper_bounds)
-    ])
-    reordered_correctly = scaled_to_bounds[[0,2,3,4,5,1]]
+    reordered_correctly = np.array([0,0,0,0,0,0])
 
     return np.zeros(6), reordered_correctly
 
 def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
     left_joints = np.zeros(6)
 
-    # indices are 1 less than what the docs say because we exclude the wrist pose (all of these are relative to the wrist)
     tip_indices = [3, 8, 13, 18, 23]
     metacarpal_indices = [0,4,9,14,20]
 
@@ -102,18 +101,14 @@ def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
     ])
     try:
         angles = Rotation.from_matrix(tips_relative_to_metacarpals[:,:3,:3]).as_euler('XYZ', degrees=False)[:,0]
-        # angles is from roughly -0.4 to 2.5, with a singularity where it jumps from -pi to pi. Needs to be transformed to range [0,1] with no singularity.
         angles = (angles-1.5) % (2*np.pi)
-        # 4.8 to 0.4
         angles[1:] = (angles[1:] - 0.4) / (4.8 - 0.4)
-        # thumb is from 3.0 to 5.3
         angles[0] = (angles[0] - 3.0) / (5.3 - 3.0)
-        # angles = (angles + np.pi) / (2 * np.pi)
         angles_list = angles.tolist()
         thumb_metacarpal_angles = Rotation.from_matrix(right_fingers_mat[0,:3,:3]).as_euler('XYZ', degrees=False).tolist()[1]
 
         combined_angles = np.clip(angles_list+[thumb_metacarpal_angles], 0, 1)
-        combined_angles[:-1] = 1-combined_angles[:-1] # these joints are flipped
+        combined_angles[:-1] = 1-combined_angles[:-1]
 
         return left_joints, combined_angles
     except ValueError:

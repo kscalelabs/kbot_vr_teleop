@@ -1,6 +1,24 @@
-from kscale_vr_teleop.arm_inverse_kinematics import *
+import time
+import numpy as np
+from kscale_vr_teleop.util import fast_mat_inv
+import ikpy.chain
+from pathlib import Path
+from scipy.spatial.transform import Rotation
+from scipy.optimize import least_squares
+from yourdfpy import URDF
+from kscale_vr_teleop.analysis.visualizer import ThreadedRobotVisualizer
+from scipy.optimize import least_squares
+from yourdfpy import URDF
 
-# Backwards compatibility shim
+right_arm_links = [
+	'base',
+	'Torso_Side_Right',
+	'KC_C_104R_PitchHardstopDriven',
+	'RS03_3',
+	'KC_C_202R',
+	'KC_C_401R_R_UpForearmDrive',
+	'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop'
+]
 
 class IKSolver:
     def __init__(self, robot: URDF):
@@ -13,10 +31,6 @@ class IKSolver:
             self.upper_bounds.append(joint.limit.upper)
 
     def from_scratch_ik(self, target_position, frame_name, initial_guess = None): # This shouldn't be necessary but ikpy's inverse kinematics is ironically crap
-        # placeholder = np.zeros(10)
-        # if initial_guess is not None: # TODO: refactor or remove this ugly code
-        #     placeholder[::2] = initial_guess
-        #     initial_guess = np.clip(placeholder, self.lower_bounds, self.upper_bounds)
         config_base = {
                 k.name: 0 for k in self.robot.actuated_joints[1::2]
             }
@@ -39,28 +53,23 @@ class IKSolver:
         result = least_squares(
             residuals, 
             self.last_guess, 
-            # np.zeros(5),
             bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf), 
             jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
-            # ftol=1e-2,
-            # gtol = 1e-2,
-            # xtol=1e-4
         )
         solution = result.x
         self.last_guess = solution
-        # if not SOLVE_WITH_BOUNDS:
-        #     solution = np.clip(solution, self.lower_bounds, self.upper_bounds)
         return solution
 
 
+from kscale_vr_teleop._assets import ASSETS_DIR
+
 file_absolute_parent = Path(__file__).parent.absolute()
 
-urdf_path  = f"{file_absolute_parent}/assets/kbot/robot.urdf"
+urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
 right_chain = ikpy.chain.Chain.from_urdf_file(
     urdf_path,
     base_elements=['base'],  # Start from the torso and let ikpy auto-discover
-    # base_element_type='joint'
 )
 
 def make_robot():
@@ -81,21 +90,10 @@ if VISUALIZE:
     visualizer.start_viewer()
     visualizer.add_marker('goal', [0.,0.,0.])
 
-
-# left_chain = ikpy.chain.Chain.from_urdf_file(
-#     f"{file_absolute_parent}/assets/kbot/robot.urdf",
-#     base_elements=['Torso_Side_Left']  # Start from the torso and let ikpy auto-discover
-#     base_element_type='joint'
-# )
-
 solver = IKSolver(arms_robot)
 
 def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_guess=None):
-    # right_wrist_mat = right_wrist_mat.copy()
-    # right_wrist_mat[:3, 3] += np.array([0,0,-1.5]) # move down to roughly match urdf coordinate system
-
     right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3], frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', initial_guess = initial_guess)
-    # right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3])
     new_config={
         k.name: right_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])
     }
@@ -103,24 +101,18 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_gues
     if VISUALIZE:
         visualizer.update_marker('goal', right_wrist_mat[:3, 3], right_wrist_mat[:3, :3])
         visualizer.update_config(new_config)
-    # print(right_wrist_mat[:3, 3], arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3])
 
     return np.zeros(5), right_joint_angles
 
 def new_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
-    # right_wrist_mat[:3, 3] += np.array([0,0,-1.5]) # move down to roughly match urdf coordinate system
     ik_solution = right_chain.inverse_kinematics(target_position = right_wrist_mat[:3, 3])
 
     new_config={
         k.name: ik_solution[1:-1][i//2] for i, k in enumerate(arms_robot.actuated_joints)
     }
     arms_robot.update_cfg(new_config)
-    # if VISUALIZE:
-    #     visualizer.update_marker('goal', right_wrist_mat[:3, 3], right_wrist_mat[:3, :3])
-    #     visualizer.update_config(new_config)
 
-    return np.zeros(5), ik_solution  # ikpy includes dummy links on both ends of the kinematic chain
-
+    return np.zeros(5), ik_solution
 
 
 import mujoco as mj
@@ -137,7 +129,7 @@ from mjinx.configuration import integrate
 integrate_jit = jax.jit(integrate, static_argnames=["dt"])
 
 # Initialize the robot model using MuJoCo
-MJCF_PATH  = f"{file_absolute_parent}/assets/kbot/robot.mjcf"
+MJCF_PATH  = str(ASSETS_DIR / "kbot" / "robot.mjcf")
 mj_model = mj.MjModel.from_xml_path(MJCF_PATH)
 mjx_model = mjx.put_model(mj_model)
 
@@ -174,36 +166,19 @@ problem.add_component(joints_barrier)
 # Initialize the solver
 local_solver = LocalIKSolver(mjx_model)
 dt = 1e-1
-# global_solver = GlobalIKSolver(mjx_model, adam(learning_rate=1), dt=1)
-
-# Initializing initial condition
-
-# Initialize solver data
-q = np.zeros(10)
-# solver_data = global_solver.init(q)
 solver_data = local_solver.init()
 
 # jit-compiling solve and integrate 
 
-# global_solve_jit = jax.jit(global_solver.solve)
 solve_jit = jax.jit(local_solver.solve)
-
-
-# for _ in range(10):
-#     frame_task.target_frame = np.array([*np.random.random(3), *np.eye(4)[0]])
-    # _ = global_solve_jit(q, solver_data, problem.compile())
 
 def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     global solver_data, q
-    # Changing problem and compiling it
     quat = Rotation.from_matrix(right_wrist_mat[:3, :3]).as_quat(scalar_first=True)
     frame_task.target_frame = np.concatenate([right_wrist_mat[:3, 3], quat])
     problem_data = problem.compile()
 
-    # Solving the instance of the problem
     opt_solution, solver_data = solve_jit(q, solver_data, problem_data)
-    # q = opt_solution.q_opt  # Direct assignment for global IK
-
     q = integrate_jit(
             mjx_model,
             q,
@@ -213,7 +188,5 @@ def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     if np.any(np.isnan(q)):
         print("NaN detected in q")
         q = np.zeros(10)
-
-    # print(opt_solution, q)
 
     return np.zeros(5), q[:5]
