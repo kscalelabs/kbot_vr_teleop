@@ -7,7 +7,6 @@ from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
 from yourdfpy import URDF
 from visualizer import ThreadedRobotVisualizer
-from lerobot.model.kinematics import RobotKinematics
 import pybullet
 import numpy as np
 from scipy.optimize import least_squares
@@ -132,33 +131,6 @@ def new_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     return np.zeros(5), ik_solution  # ikpy includes dummy links on both ends of the kinematic chain
 
 
-placo_robot = RobotKinematics(
-    f"{file_absolute_parent}/assets/kbot/robot.urdf",
-    "KB_C_501X_Right_Bayonet_Adapter_Hard_Stop",
-    [
-        'dof_right_shoulder_pitch_03',
-        'dof_right_shoulder_roll_03',
-        'dof_right_shoulder_yaw_02',
-        'dof_right_elbow_02',
-        'dof_right_wrist_00'
-    ]
-)
-
-last_placo_joints = np.zeros(5)
-
-def placo_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
-    global last_placo_joints
-    ik_solution = placo_robot.inverse_kinematics(
-        last_placo_joints, right_wrist_mat, 1.0, 0.0
-    )
-    last_placo_joints = ik_solution
-
-    return np.zeros(5), ik_solution
-
-# pybullet.connect(pybullet.DIRECT)
-# pybullet_bot = pybullet.loadURDF(urdf_path)
-
-# def pybullet_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
 
 import mujoco as mj
 from mujoco import mjx

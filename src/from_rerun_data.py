@@ -3,7 +3,7 @@ import polars as pl
 import numpy as np
 from pathlib import Path
 from transforms.compute_transforms import compute_transform, center_k, radius_k
-from arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, placo_calculate_arm_joints, placo_robot, jax_calculate_arm_joints
+from arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints
 from tqdm import tqdm
 from line_profiler import profile
 
@@ -101,7 +101,6 @@ def main():
         arms_robot.update_cfg(new_config)
         old_fk_wrist_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
 
-        placo_ee_position = placo_robot.forward_kinematics(placo_joints)[:3,3]
         _, jax_joints = jax_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
 
         new_config = {k.name: jax_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
@@ -112,7 +111,6 @@ def main():
         rr.log('fk_position', rr.Points3D([fk_wrist_position], colors=[[255,0,0]], radii=0.01))
         rr.log('jax_ee_position', rr.Points3D([jax_ee_position], colors=[[255,0,255]], radii=0.01))
         rr.log('old_fk_position', rr.Points3D([old_fk_wrist_position], colors=[[0,0,255]], radii=0.01))
-        rr.log('placo_ee_position', rr.Points3D([placo_ee_position], colors=[[255,255,0]], radii=0.01))
         rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))
 
         new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
