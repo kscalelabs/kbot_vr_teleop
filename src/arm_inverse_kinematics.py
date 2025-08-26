@@ -11,6 +11,16 @@ import numpy as np
 from scipy.optimize import least_squares
 from yourdfpy import URDF
 
+right_arm_links = [
+	'base',
+	'Torso_Side_Right',
+	'KC_C_104R_PitchHardstopDriven',
+	'RS03_3',
+	'KC_C_202R',
+	'KC_C_401R_R_UpForearmDrive',
+	'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop'
+]
+
 class IKSolver:
     def __init__(self, robot: URDF):
         self.robot = robot

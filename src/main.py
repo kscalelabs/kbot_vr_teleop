@@ -5,7 +5,7 @@ import asyncio
 from vuer.schemas import ImageBackground, Hands
 import numpy as np
 from erics_cameras.libcamera_cam import LibCameraCam
-from arm_inverse_kinematics import new_calculate_arm_joints
+from arm_inverse_kinematics import calculate_arm_joints, arms_robot, right_arm_links
 from hand_inverse_kinematics import calculate_hand_joints_no_ik
 from udp_conn import UDPHandler
 from util import fast_mat_inv
@@ -62,9 +62,14 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
     
     while True:
-        left_arm_joints, right_arm_joints = new_calculate_arm_joints(head_matrix, base_to_head_transform @ left_wrist_pose, base_to_head_transform @ right_wrist_pose)
+        left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, base_to_head_transform @ left_wrist_pose, base_to_head_transform @ right_wrist_pose)
         left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
         udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
+
+        new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+        arms_robot.update_cfg(new_config)
+        positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
+        rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
         if STREAM:
             ret_left, frame_left = cam_left.read()
             ret_right, frame_right = cam_right.read()

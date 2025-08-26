@@ -3,7 +3,7 @@ import polars as pl
 import numpy as np
 from pathlib import Path
 from transforms.compute_transforms import compute_transform
-from arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints
+from arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints, right_arm_links
 from tqdm import tqdm
 from line_profiler import profile
 
@@ -52,15 +52,6 @@ rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), stat
 # initialize robot config
 arms_robot.update_cfg({k.name: 0 for k in arms_robot.actuated_joints})
 
-right_arm_links = [
-	'base',
-	'Torso_Side_Right',
-	'KC_C_104R_PitchHardstopDriven',
-	'RS03_3',
-	'KC_C_202R',
-	'KC_C_401R_R_UpForearmDrive',
-	'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop'
-]
 
 # Iterate frames and perform IK + visualization
 err = []
