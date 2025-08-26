@@ -145,7 +145,7 @@ from mjinx.configuration import integrate
 integrate_jit = jax.jit(integrate, static_argnames=["dt"])
 
 # Initialize the robot model using MuJoCo
-MJCF_PATH = "/home/miller/code/vr_teleop/src/assets/kbot/robot.mjcf"
+MJCF_PATH  = f"{file_absolute_parent}/assets/kbot/robot.mjcf"
 mj_model = mj.MjModel.from_xml_path(MJCF_PATH)
 mjx_model = mjx.put_model(mj_model)
 
