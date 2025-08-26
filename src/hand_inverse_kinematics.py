@@ -106,15 +106,22 @@ def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
     tips_relative_to_metacarpals = np.array([
         fast_mat_inv(right_fingers_mat[i]) @ right_fingers_mat[j] for i, j in zip(metacarpal_indices, tip_indices)
     ])
-    angles = Rotation.from_matrix(tips_relative_to_metacarpals[:,:3,:3]).as_euler('XYZ', degrees=False)[:,0]
-    # angles is from roughly -0.4 to 2.5, with a singularity where it jumps from -pi to pi. Needs to be transformed to range [0,1] with no singularity.
-    angles = (angles-1.5) % (2*np.pi)
-    # 4.8 to 0.4
-    angles[1:] = (angles[1:] - 0.4) / (4.8 - 0.4)
-    # thumb is from 3.0 to 5.3
-    angles[0] = (angles[0] - 3.0) / (5.3 - 3.0)
-    # angles = (angles + np.pi) / (2 * np.pi)
-    angles_list = angles.tolist()
-    thumb_metacarpal_angles = Rotation.from_matrix(right_fingers_mat[0,:3,:3]).as_euler('XYZ', degrees=False).tolist()[1]
+    try:
+        angles = Rotation.from_matrix(tips_relative_to_metacarpals[:,:3,:3]).as_euler('XYZ', degrees=False)[:,0]
+        # angles is from roughly -0.4 to 2.5, with a singularity where it jumps from -pi to pi. Needs to be transformed to range [0,1] with no singularity.
+        angles = (angles-1.5) % (2*np.pi)
+        # 4.8 to 0.4
+        angles[1:] = (angles[1:] - 0.4) / (4.8 - 0.4)
+        # thumb is from 3.0 to 5.3
+        angles[0] = (angles[0] - 3.0) / (5.3 - 3.0)
+        # angles = (angles + np.pi) / (2 * np.pi)
+        angles_list = angles.tolist()
+        thumb_metacarpal_angles = Rotation.from_matrix(right_fingers_mat[0,:3,:3]).as_euler('XYZ', degrees=False).tolist()[1]
 
-    return left_joints, np.clip(angles_list+[thumb_metacarpal_angles], 0, 1)
+        combined_angles = np.clip(angles_list+[thumb_metacarpal_angles], 0, 1)
+        combined_angles[:-1] = 1-combined_angles[:-1] # these joints are flipped
+
+        return left_joints, combined_angles
+    except ValueError:
+        print("ValueError in hand position no ik function")
+        return np.zeros(6), np.zeros(6)
