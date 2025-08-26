@@ -6,7 +6,7 @@ from util import fast_mat_inv
 import ikpy.chain
 from yourdfpy import URDF
 from pathlib import Path
-from visualizer import ThreadedRobotVisualizer
+from analysis.visualizer import ThreadedRobotVisualizer
 
 file_absolute_parent = Path(__file__).parent.absolute()
 

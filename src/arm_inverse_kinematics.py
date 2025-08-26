@@ -6,7 +6,7 @@ from pathlib import Path
 from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
 from yourdfpy import URDF
-from visualizer import ThreadedRobotVisualizer
+from analysis.visualizer import ThreadedRobotVisualizer
 import numpy as np
 from scipy.optimize import least_squares
 from yourdfpy import URDF
@@ -58,11 +58,12 @@ class IKSolver:
         result = least_squares(
             residuals, 
             self.last_guess, 
+            # np.zeros(5),
             bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf), 
             jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
-            ftol=1e-2,
-            gtol = 1e-2,
-            xtol=1e-4
+            # ftol=1e-2,
+            # gtol = 1e-2,
+            # xtol=1e-4
         )
         solution = result.x
         self.last_guess = solution

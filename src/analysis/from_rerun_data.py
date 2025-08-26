@@ -4,9 +4,11 @@ import numpy as np
 from pathlib import Path
 from transforms.compute_transforms import compute_transform
 from arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints, right_arm_links
+from analysis.rerun_loader_urdf import URDFLogger
 from tqdm import tqdm
 from line_profiler import profile
 
+urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
 
 def sphere_points(center, radius, n_theta=32, n_phi=16):
 	"""Generate points on sphere surface for visualization."""
@@ -20,10 +22,10 @@ def sphere_points(center, radius, n_theta=32, n_phi=16):
 	return pts
 
 
-rr.init("scrub_ik_data_from_rerun", spawn=True)
+rr.init("replay_teleop_from_rerun", spawn=True)
 
 # Load recording and convert to a Polars dataframe
-recording_path = Path(__file__).parent / "wrist_translated_to_head.rrd"
+recording_path = Path(__file__).parent / "vr_teleop_irl_data.rrd"
 recording = rr.dataframe.load_recording(str(recording_path))
 view = recording.view(index="log_time", contents="/**")
 df = pl.from_arrow(view.select().read_all())
@@ -116,11 +118,12 @@ def main():
         rr.log('old_fk_position', rr.Points3D([old_fk_wrist_position], colors=[[0,0,255]], radii=0.01))
         rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))
 
-        new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        print([k.name for k in arms_robot.actuated_joints[::2]])
-        arms_robot.update_cfg(new_config)
-        positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
-        rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
+        # new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+        # print([k.name for k in arms_robot.actuated_joints[::2]])
+        # arms_robot.update_cfg(new_config)
+        # positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
+        # rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
+        urdf_logger.log()
 
     print('Done')
     mse = np.mean(np.array(err)**2)
