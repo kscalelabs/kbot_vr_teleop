@@ -166,6 +166,7 @@ from mjinx.components.tasks import ComTask, FrameTask, JointTask
 from mjinx.solvers import LocalIKSolver, GlobalIKSolver
 from mjinx.components.barriers import JointBarrier
 import jax
+from optax import adam
 
 from mjinx.configuration import integrate
 
@@ -175,6 +176,24 @@ integrate_jit = jax.jit(integrate, static_argnames=["dt"])
 MJCF_PATH = "/home/miller/code/vr_teleop/src/assets/kbot/robot.mjcf"
 mj_model = mj.MjModel.from_xml_path(MJCF_PATH)
 mjx_model = mjx.put_model(mj_model)
+
+print(f"Model nq (positions): {mjx_model.nq}")
+print(f"Model nv (velocities): {mjx_model.nv}")
+print(f"Expected: 10 arm joints")
+
+# Print all joints that actually exist
+print("\nActual joints in model:")
+for i in range(mjx_model.njnt):
+    joint_name = mj.mj_id2name(mj_model, mj.mjtObj.mjOBJ_JOINT, i)
+    joint_type = mj_model.jnt_type[i]
+    joint_qpos_adr = mj_model.jnt_qposadr[i]
+    joint_dof_adr = mj_model.jnt_dofadr[i]
+    
+    type_names = {0: 'free', 1: 'ball', 2: 'slide', 3: 'hinge'}
+    type_name = type_names.get(joint_type, f'unknown({joint_type})')
+    
+    print(f"Joint {i}: '{joint_name}' type={type_name} qpos_adr={joint_qpos_adr} dof_adr={joint_dof_adr}")
+
 
 # Create instance of the problem
 problem = Problem(mjx_model)
@@ -190,13 +209,13 @@ problem.add_component(joints_barrier)
 
 # Initialize the solver
 local_solver = LocalIKSolver(mjx_model)
-global_solver = GlobalIKSolver(mjx_model)
+global_solver = GlobalIKSolver(mjx_model, adam(learning_rate=1e-2), dt=1e-2)
 
 # Initializing initial condition
-q = np.zeros(27)
+q = np.zeros(10)
 
 # Initialize solver data
-solver_data = local_solver.init()
+solver_data = global_solver.init(q)
 
 # jit-compiling solve and integrate 
 
@@ -213,15 +232,19 @@ def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     problem_data = problem.compile()
 
     # Solving the instance of the problem
-    opt_solution, solver_data = solve_jit(q, solver_data, problem_data)
+    opt_solution, solver_data = global_solve_jit(q, solver_data, problem_data)
+    q = opt_solution.q_opt  # Direct assignment for global IK
+    if np.any(np.isnan(q)):
+        print("NaN detected in q")
+        q = np.zeros(10)
 
-    q = integrate_jit(
-            mjx_model,
-            q,
-            velocity=opt_solution.v_opt,
-            dt=dt,
-        )
+    # q = integrate_jit(
+    #         mjx_model,
+    #         q,
+    #         velocity=opt_solution.v_opt,
+    #         dt=dt,
+    #     )
 
-    print(opt_solution, q)
+    # print(opt_solution, q)
 
-    return np.zeros(5), opt_solution
+    return np.zeros(5), np.zeros(5)
