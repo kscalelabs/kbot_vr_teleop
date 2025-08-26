@@ -2,6 +2,7 @@ import time
 import numpy as np
 import socket
 import json
+import rerun as rr
 
 
 
@@ -64,7 +65,16 @@ class UDPHandler:
             # other fingers: -2.3, 1
             "fingers": (np.clip(65535-right_finger_angles * 65535, 0, 65535).astype(int)).tolist()
         }
-        print(payload)
+        # loop through keys recursively and log rerun scalars for each leaf node
+        def log_rerun_scalars(data, parent_key=""):
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    log_rerun_scalars(value, parent_key=f"{parent_key}.{key}" if parent_key else key)
+            else:
+                rr.log(parent_key, rr.Scalar(data), static=True)
+
+        log_rerun_scalars(payload)
+
         try:
             self._udp_sock.sendto(json.dumps(payload).encode("utf-8"), (self.udp_host, self.udp_port))
         except Exception:

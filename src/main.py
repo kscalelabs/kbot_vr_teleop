@@ -48,6 +48,12 @@ right_arm_joints = np.zeros(5)
 
 STREAM = False
 
+# offset between VR headset and urdf base link (?) Kinda ad-hoc estimated and seems to work, didn't think about it too hard.
+base_to_head_transform = np.eye(4)
+base_to_head_transform[:3,3] = np.array([
+	0, 0, 0.25
+])
+
 async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     if STREAM:
         left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
@@ -56,7 +62,7 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
     
     while True:
-        left_arm_joints, right_arm_joints = new_calculate_arm_joints(head_matrix, left_wrist_pose, right_wrist_pose)
+        left_arm_joints, right_arm_joints = new_calculate_arm_joints(head_matrix, base_to_head_transform @ left_wrist_pose, base_to_head_transform @ right_wrist_pose)
         left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
         udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
         if STREAM:
