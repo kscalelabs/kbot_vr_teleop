@@ -2,7 +2,6 @@ import rerun as rr
 import polars as pl
 import numpy as np
 from pathlib import Path
-from kscale_vr_teleop.transforms.compute_transforms import compute_transform
 from kscale_vr_teleop.arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints, right_arm_links
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from tqdm import tqdm

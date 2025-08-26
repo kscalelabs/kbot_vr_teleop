@@ -15,12 +15,16 @@ import rerun as rr  # pip install rerun-sdk
 import scipy.spatial.transform as st
 import trimesh
 from urdf_parser_py import urdf as urdf_parser
+from pathlib import Path
 
 class URDFLogger:
     """Class to log a URDF to Rerun."""
 
     def __init__(self, filepath: str, root_path: str = "") -> None:
-        self.urdf = urdf_parser.URDF.from_xml_file(filepath)
+        urdf_contents = open(filepath, 'r').read()
+        urdf_parent_path =Path(filepath).absolute().parent
+        urdf_contents = urdf_contents.replace('filename="', f'filename="{urdf_parent_path}/')
+        self.urdf = urdf_parser.URDF.from_xml_string(urdf_contents)
         self.mat_name_to_mat = {mat.name: mat for mat in self.urdf.materials}
         self.entity_to_transform = {}
         self.root_path = root_path
