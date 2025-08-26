@@ -2,7 +2,7 @@ import rerun as rr
 import polars as pl
 import numpy as np
 from pathlib import Path
-from transforms.compute_transforms import compute_transform, center_k, radius_k
+from transforms.compute_transforms import compute_transform
 from arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints
 from tqdm import tqdm
 from line_profiler import profile
@@ -63,6 +63,7 @@ right_arm_links = [
 ]
 
 # Iterate frames and perform IK + visualization
+err = []
 @profile
 def main():
     for i, row in enumerate(tqdm(df.iter_rows(named=True), total=len(df))):
@@ -100,15 +101,27 @@ def main():
         arms_robot.update_cfg(new_config)
         old_fk_wrist_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
 
-        _, jax_joints = jax_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
+        # _, jax_joints = jax_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
 
-        new_config = {k.name: jax_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        arms_robot.update_cfg(new_config)
-        jax_ee_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
+        # new_config = {k.name: jax_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+        # arms_robot.update_cfg(new_config)
+        # jax_ee_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
+
+        # compute L2 residuals (target position vs each solver's end-effector position)
+        target_pos = frame_mat[:3,3]
+        res_new = float(np.linalg.norm(fk_wrist_position - target_pos))
+        res_old = float(np.linalg.norm(old_fk_wrist_position - target_pos))
+        # res_jax = float(np.linalg.norm(jax_ee_position - target_pos))
+
+        # log residuals as scalars so Rerun can plot them over time
+        rr.log('residual_new', rr.Scalar(res_new))
+        rr.log('residual_old', rr.Scalar(res_old))
+        err.append(res_old)
+        # rr.log('residual_jax', rr.Scalar(res_jax))
 
         # Rerun logging
         rr.log('fk_position', rr.Points3D([fk_wrist_position], colors=[[255,0,0]], radii=0.01))
-        rr.log('jax_ee_position', rr.Points3D([jax_ee_position], colors=[[255,0,255]], radii=0.01))
+        # rr.log('jax_ee_position', rr.Points3D([jax_ee_position], colors=[[255,0,255]], radii=0.01))
         rr.log('old_fk_position', rr.Points3D([old_fk_wrist_position], colors=[[0,0,255]], radii=0.01))
         rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))
 
@@ -118,5 +131,8 @@ def main():
         rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
 
     print('Done')
+    mse = np.mean(np.array(err)**2)
+    print(f'MSE: {mse}')
+    rr.log('mse', rr.Scalar(mse), static=True)
 
 main()

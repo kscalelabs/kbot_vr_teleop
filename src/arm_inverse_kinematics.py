@@ -50,9 +50,9 @@ class IKSolver:
             self.last_guess, 
             bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf), 
             jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
-            # ftol=1e-5,
-            # gtol = 1e-5,
-            # xtol=1e-5
+            ftol=1e-2,
+            gtol = 1e-2,
+            xtol=1e-4
         )
         solution = result.x
         self.last_guess = solution
@@ -182,23 +182,24 @@ problem.add_component(joints_barrier)
 # Initialize the solver
 local_solver = LocalIKSolver(mjx_model)
 dt = 1e-1
-global_solver = GlobalIKSolver(mjx_model, adam(learning_rate=1), dt=1)
+# global_solver = GlobalIKSolver(mjx_model, adam(learning_rate=1), dt=1)
 
 # Initializing initial condition
 
 # Initialize solver data
 q = np.zeros(10)
-solver_data = global_solver.init(q)
+# solver_data = global_solver.init(q)
+solver_data = local_solver.init()
 
 # jit-compiling solve and integrate 
 
-global_solve_jit = jax.jit(global_solver.solve)
+# global_solve_jit = jax.jit(global_solver.solve)
 solve_jit = jax.jit(local_solver.solve)
 
 
-for _ in range(10):
-    frame_task.target_frame = np.array([*np.random.random(3), *np.eye(4)[0]])
-    _ = global_solve_jit(q, solver_data, problem.compile())
+# for _ in range(10):
+#     frame_task.target_frame = np.array([*np.random.random(3), *np.eye(4)[0]])
+    # _ = global_solve_jit(q, solver_data, problem.compile())
 
 def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     global solver_data, q
@@ -208,18 +209,18 @@ def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     problem_data = problem.compile()
 
     # Solving the instance of the problem
-    opt_solution, solver_data = global_solve_jit(q, solver_data, problem_data)
-    q = opt_solution.q_opt  # Direct assignment for global IK
+    opt_solution, solver_data = solve_jit(q, solver_data, problem_data)
+    # q = opt_solution.q_opt  # Direct assignment for global IK
+
+    q = integrate_jit(
+            mjx_model,
+            q,
+            velocity=opt_solution.v_opt,
+            dt=dt,
+        )
     if np.any(np.isnan(q)):
         print("NaN detected in q")
         q = np.zeros(10)
-
-    # q = integrate_jit(
-    #         mjx_model,
-    #         q,
-    #         velocity=opt_solution.v_opt,
-    #         dt=dt,
-    #     )
 
     # print(opt_solution, q)
 
