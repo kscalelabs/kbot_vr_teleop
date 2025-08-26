@@ -1,0 +1,127 @@
+Timer unit: 1e-09 s
+
+Total time: 39.4114 s
+File: /home/dpsh/miniforge3/envs/vr-teleop/lib/python3.12/site-packages/yourdfpy/urdf.py
+Function: URDF.update_cfg at line 1084
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1084                                               @profile
+  1085                                               def update_cfg(self, configuration):
+  1086                                                   """Update joint configuration of URDF; does forward kinematics.
+  1087                                           
+  1088                                                   Args:
+  1089                                                       configuration (dict, list[float], tuple[float] or np.ndarray): A mapping from joints or joint names to configuration values, or a list containing a value for each actuated joint.
+  1090                                           
+  1091                                                   Raises:
+  1092                                                       ValueError: Raised if dimensionality of configuration does not match number of actuated joints of URDF model.
+  1093                                                       TypeError: Raised if configuration is neither a dict, list, tuple or np.ndarray.
+  1094                                                   """
+  1095     27302   33249023.0   1217.8      0.1          joint_cfg = []
+  1096                                           
+  1097     27302   38682771.0   1416.8      0.1          if isinstance(configuration, dict):
+  1098    289082  233536186.0    807.9      0.6              for joint in configuration:
+  1099    261780  218468119.0    834.5      0.6                  if isinstance(joint, six.string_types):
+  1100    261780  246201565.0    940.5      0.6                      joint_cfg.append((self._joint_map[joint], configuration[joint]))
+  1101                                                           elif isinstance(joint, Joint):
+  1102                                                               # TODO: Joint is not hashable; so this branch will not succeed
+  1103                                                               joint_cfg.append((joint, configuration[joint]))
+  1104                                                   elif isinstance(configuration, (list, tuple, np.ndarray)):
+  1105                                                       if len(configuration) == len(self.robot.joints):
+  1106                                                           for joint, value in zip(self.robot.joints, configuration):
+  1107                                                               joint_cfg.append((joint, value))
+  1108                                                       elif len(configuration) == self.num_actuated_joints:
+  1109                                                           for joint, value in zip(self._actuated_joints, configuration):
+  1110                                                               joint_cfg.append((joint, value))
+  1111                                                       else:
+  1112                                                           raise ValueError(
+  1113                                                               f"Dimensionality of configuration ({len(configuration)}) doesn't match number of all ({len(self.robot.joints)}) or actuated joints ({self.num_actuated_joints})."
+  1114                                                           )
+  1115                                                   else:
+  1116                                                       raise TypeError("Invalid type for configuration")
+  1117                                           
+  1118                                                   # append all mimic joints in the update
+  1119    343686  402123385.0   1170.0      1.0          for j, q in joint_cfg + [
+  1120     54604   84475575.0   1547.1      0.2              (j, 0.0) for j in self.robot.joints if j.mimic is not None
+  1121                                                   ]:
+  1122    261780     2.24e+10  85472.0     56.8              matrix, joint_q = self._forward_kinematics_joint(j, q=q)
+  1123                                           
+  1124                                                       # update internal configuration vector - only consider actuated joints
+  1125    261780  933284396.0   3565.1      2.4              if j.name in self.actuated_joint_names:
+  1126    523560 1346831528.0   2572.4      3.4                  self._cfg[
+  1127    261780 1159359570.0   4428.8      2.9                      self.actuated_dof_indices[self.actuated_joint_names.index(j.name)]
+  1128    261780  190952474.0    729.4      0.5                  ] = joint_q
+  1129                                           
+  1130    261780  217779838.0    831.9      0.6              if self._scene is not None:
+  1131    523560     1.15e+10  21917.5     29.1                  self._scene.graph.update(
+  1132    261780  236573755.0    903.7      0.6                      frame_from=j.parent, frame_to=j.child, matrix=matrix
+  1133                                                           )
+  1134    261780  219861680.0    839.9      0.6              if self._scene_collision is not None:
+  1135                                                           self._scene_collision.graph.update(
+  1136                                                               frame_from=j.parent, frame_to=j.child, matrix=matrix
+  1137                                                           )
+
+Total time: 134.488 s
+File: /home/dpsh/kscale_vr_teleop/src/from_rerun_data.py
+Function: main at line 66
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    66                                           @profile
+    67                                           def main():
+    68       563  587553764.0 1.04e+06      0.4      for i, row in enumerate(tqdm(df.iter_rows(named=True), total=len(df))):
+    69                                                   # read translation and rotation (user confirmed these parse correctly)
+    70       562    6509491.0  11582.7      0.0          translation = np.array(row['/right_wrist:Translation3D']).reshape(3,)
+    71       562     806631.0   1435.3      0.0          rot_cell = row.get('/right_wrist:TransformMat3x3')
+    72       562     482992.0    859.4      0.0          if rot_cell is None:
+    73                                                       rotation = np.eye(3)
+    74                                                   else:
+    75       562    3547700.0   6312.6      0.0              rotation = np.array(rot_cell).reshape((3,3))
+    76                                           
+    77       562   16227573.0  28874.7      0.0          frame_mat = np.eye(4)
+    78       562    2348801.0   4179.4      0.0          frame_mat[:3,:3] = rotation
+    79       562    1243253.0   2212.2      0.0          frame_mat[:3,3] = translation
+    80                                           
+    81                                                   # map to kbot space
+    82       562    8347133.0  14852.5      0.0          frame_mat = transform @ frame_mat
+    83                                           
+    84                                                   # timestamp if present
+    85       562     962286.0   1712.3      0.0          timestamp = row.get('log_time') if 'log_time' in row else None
+    86       562     411160.0    731.6      0.0          if timestamp is None:
+    87                                                       timestamp = int(i)
+    88                                           
+    89                                                   # IK computations
+    90       562     1.02e+11 1.81e+08     75.6          _, old_arm_joint_angles = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
+    91       562 6349903372.0 1.13e+07      4.7          _, arm_joint_angles = new_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
+    92                                           
+    93       562   14301702.0  25447.9      0.0          rr.set_time_seconds('my_timeline', timestamp.timestamp())
+    94                                           
+    95                                                   # forward kinematics positions
+    96       562  109323479.0 194525.8      0.1          fk_wrist_position = right_chain.forward_kinematics(arm_joint_angles)[:3,3]
+    97                                           
+    98                                                   # apply old solution to robot config (old_arm_joint_angles already sampled in calculate_arm_joints)
+    99       562    3645718.0   6487.0      0.0          new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+   100       562  449569554.0 799945.8      0.3          arms_robot.update_cfg(new_config)
+   101       562  346769944.0 617028.4      0.3          old_fk_wrist_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
+   102                                           
+   103       562     1.83e+10 3.25e+07     13.6          _, jax_joints = jax_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
+   104                                           
+   105       562 1434723268.0 2.55e+06      1.1          new_config = {k.name: jax_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+   106       562  813199932.0 1.45e+06      0.6          arms_robot.update_cfg(new_config)
+   107       562  377420231.0 671566.2      0.3          jax_ee_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
+   108                                           
+   109                                                   # Rerun logging
+   110       562  569373017.0 1.01e+06      0.4          rr.log('fk_position', rr.Points3D([fk_wrist_position], colors=[[255,0,0]], radii=0.01))
+   111       562  399421303.0 710714.1      0.3          rr.log('jax_ee_position', rr.Points3D([jax_ee_position], colors=[[255,0,255]], radii=0.01))
+   112       562  365672043.0 650662.0      0.3          rr.log('old_fk_position', rr.Points3D([old_fk_wrist_position], colors=[[0,0,255]], radii=0.01))
+   113       562  660111026.0 1.17e+06      0.5          rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))
+   114                                           
+   115       562   29495511.0  52483.1      0.0          new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+   116       562  534566646.0 951186.2      0.4          arms_robot.update_cfg(new_config)
+   117       562  917825440.0 1.63e+06      0.7          positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
+   118       562  542217493.0 964799.8      0.4          rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
+   119                                           
+   120         1      22444.0  22444.0      0.0      print('Done')
+
+ 39.41 seconds - /home/dpsh/miniforge3/envs/vr-teleop/lib/python3.12/site-packages/yourdfpy/urdf.py:1084 - URDF.update_cfg
+134.49 seconds - /home/dpsh/kscale_vr_teleop/src/from_rerun_data.py:66 - main

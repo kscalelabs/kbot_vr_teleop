@@ -1,0 +1,72 @@
+Timer unit: 1e-09 s
+
+Total time: 28.1169 s
+File: /home/dpsh/kscale_vr_teleop/src/main.py
+Function: stream_cameras at line 46
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    46                                           @profile
+    47                                           async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
+    48         2       6037.0   3018.5      0.0      if STREAM:
+    49                                                   left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+    50                                                   right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+    51                                                   cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
+    52                                                   cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+    53                                               
+    54       130     272676.0   2097.5      0.0      while True:
+    55       130     2.53e+10 1.94e+08     89.9          left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, left_wrist_pose, right_wrist_pose)
+    56       130 2804004917.0 2.16e+07     10.0          left_finger_joints, right_finger_joints = calculate_hand_joints(left_finger_poses, right_finger_poses)
+    57       129   32912379.0 255134.7      0.1          udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
+    58       129     260540.0   2019.7      0.0          if STREAM:
+    59                                                       ret_left, frame_left = cam_left.read()
+    60                                                       ret_right, frame_right = cam_right.read()
+    61                                                       if not ret_left or not ret_right:
+    62                                                           continue
+    63                                                       frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
+    64                                                       # frame_right_rgb = cv2.cvtColor(frame_right, cv2.COLOR_BGR2RGB)
+    65                                                       frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
+    66                                                       frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
+    67                                                       frame_right_rgb = frame_left_rgb.copy()
+    68                                                       # frame_right_rgb = cv2.undistort(frame_right_rgb, cam_mat, dist_coeffs)
+    69                                                       # Add text labels for left/right cameras
+    70                                                       # cv2.putText(frame_left_rgb, "Left Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+    71                                                       # cv2.putText(frame_right_rgb, "Right Camera", (600, 30), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 4)
+    72                                                       # Send both images as ImageBackground objects for left/right eye
+    73                                                       interpupilary_dist = 0
+    74                                           
+    75                                                       distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1] # TODO: remove this hard-coded 2 multiplier
+    76                                                       vertical_angle_rad = np.deg2rad(25)  # Example vertical angle, adjust as needed
+    77                                                       # Calculate positions for left and right screens with vertical displacement
+    78                                                       # Keep the same distance from user but move down by the vertical angle
+    79                                                       y_offset = -distance_to_camera * np.sin(vertical_angle_rad)  # Negative for below horizon
+    80                                                       z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)  # Adjustment to maintain distance
+    81                                                       session.upsert([
+    82                                                           ImageBackground(
+    83                                                               frame_left_rgb,
+    84                                                               aspect=1.778,
+    85                                                               height=2,
+    86                                                               distanceToCamera=distance_to_camera,
+    87                                                               position=[-interpupilary_dist/2, y_offset, z_offset],
+    88                                                               layers=1,
+    89                                                               format="jpeg",
+    90                                                               quality=1000,
+    91                                                               key="background-left",
+    92                                                               interpolate=True,
+    93                                                           ),
+    94                                                           ImageBackground(
+    95                                                               frame_right_rgb,
+    96                                                               aspect=1.778,
+    97                                                               height=2,
+    98                                                               distanceToCamera=distance_to_camera,
+    99                                                               position=[-interpupilary_dist/2, y_offset, z_offset],
+   100                                                               layers=2,
+   101                                                               format="jpeg",
+   102                                                               quality=1000,
+   103                                                               key="background-right",
+   104                                                               interpolate=True,
+   105                                                           ),
+   106                                                       ], to="bgChildren")
+   107       129   12509025.0  96969.2      0.0          await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
+
+ 28.12 seconds - /home/dpsh/kscale_vr_teleop/src/main.py:46 - stream_cameras

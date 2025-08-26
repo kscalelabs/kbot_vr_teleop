@@ -50,16 +50,16 @@ class UDPHandler:
         payload = {
             "timestamp": time.time(),
             "joints": {
-                "11": -left_arm_angles[4],
-                "12": left_arm_angles[3],
+                "11": -left_arm_angles[0],
+                "12": left_arm_angles[1],
                 "13": left_arm_angles[2],
-                "14": left_arm_angles[1],
-                "15": left_arm_angles[0],
-                "21": right_arm_angles[4],
-                "22": right_arm_angles[3],
-                "23": right_arm_angles[2],
-                "24": right_arm_angles[1],
-                "25": right_arm_angles[0]
+                "14": left_arm_angles[3],
+                "15": left_arm_angles[4],
+                "21": np.rad2deg(right_arm_angles[0]),
+                "22": np.rad2deg(right_arm_angles[1]),
+                "23": np.rad2deg(right_arm_angles[2]),
+                "24": np.rad2deg(right_arm_angles[3]),
+                "25": np.rad2deg(right_arm_angles[4])
             },
             # thumb: -0.2, 1
             # other fingers: -2.3, 1

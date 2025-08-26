@@ -117,6 +117,7 @@ def main():
         rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))
 
         new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+        print([k.name for k in arms_robot.actuated_joints[::2]])
         arms_robot.update_cfg(new_config)
         positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
         rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))

@@ -16,6 +16,7 @@ import rerun as rr
 
 rr.init("vr_teleop", spawn=True)
 
+rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
 kbot_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
 kbot_vuer_to_urdf_frame[:3,:3] = np.array([
     [0, 0, -1],
