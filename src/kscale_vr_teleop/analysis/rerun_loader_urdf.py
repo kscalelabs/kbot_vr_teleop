@@ -28,6 +28,8 @@ class URDFLogger:
         self.mat_name_to_mat = {mat.name: mat for mat in self.urdf.materials}
         self.entity_to_transform = {}
         self.root_path = root_path
+        self.meshes_cache = {}
+    
 
     def link_entity_path(self, link: urdf_parser.Link) -> str:
         root_name = self.urdf.get_root()
@@ -156,11 +158,28 @@ class URDFLogger:
             )
             mesh_or_scene = trimesh.Trimesh()
         
-        mesh_or_scene.apply_transform(transform)
-
-        if isinstance(mesh_or_scene, trimesh.Scene):
-            scene = mesh_or_scene
-            for i, mesh in enumerate(scene.dump()):
+        # mesh_or_scene.apply_transform(transform)
+        if entity_path in self.meshes_cache:
+            rr.log(self.root_path + entity_path, rr.InstancePoses3D(
+                translations=[
+                    transform[:3, 3].tolist()
+                ],
+                mat3x3=[transform[:3, :3].tolist()]
+            ))
+        else:
+            if isinstance(mesh_or_scene, trimesh.Scene):
+                scene = mesh_or_scene
+                for i, mesh in enumerate(scene.dump()):
+                    if material is not None:
+                        if material.color is not None:
+                            mesh.visual = trimesh.visual.ColorVisuals()
+                            mesh.visual.vertex_colors = material.color.rgba
+                        elif material.texture is not None:
+                            texture_path = resolve_ros_path(material.texture.filename)
+                            mesh.visual = trimesh.visual.texture.TextureVisuals(image=Image.open(texture_path))
+                    log_trimesh(self.root_path + entity_path+f"/{i}", mesh)
+            else:
+                mesh = mesh_or_scene
                 if material is not None:
                     if material.color is not None:
                         mesh.visual = trimesh.visual.ColorVisuals()
@@ -168,17 +187,8 @@ class URDFLogger:
                     elif material.texture is not None:
                         texture_path = resolve_ros_path(material.texture.filename)
                         mesh.visual = trimesh.visual.texture.TextureVisuals(image=Image.open(texture_path))
-                log_trimesh(self.root_path + entity_path+f"/{i}", mesh)
-        else:
-            mesh = mesh_or_scene
-            if material is not None:
-                if material.color is not None:
-                    mesh.visual = trimesh.visual.ColorVisuals()
-                    mesh.visual.vertex_colors = material.color.rgba
-                elif material.texture is not None:
-                    texture_path = resolve_ros_path(material.texture.filename)
-                    mesh.visual = trimesh.visual.texture.TextureVisuals(image=Image.open(texture_path))
-            log_trimesh(self.root_path + entity_path, mesh)
+                log_trimesh(self.root_path + entity_path, mesh)
+            self.meshes_cache[entity_path] = mesh
 
 
 def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
