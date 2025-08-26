@@ -55,6 +55,9 @@ class IKSolver:
             self.last_guess, 
             bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf), 
             jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
+            xtol=1e-5,
+            gtol=1e-5,
+            ftol=1e-5,
         )
         solution = result.x
         self.last_guess = solution
