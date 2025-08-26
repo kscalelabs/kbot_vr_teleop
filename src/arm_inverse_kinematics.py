@@ -247,4 +247,4 @@ def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
 
     # print(opt_solution, q)
 
-    return np.zeros(5), np.zeros(5)
+    return np.zeros(5), q[:5]
