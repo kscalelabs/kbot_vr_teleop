@@ -39,12 +39,30 @@ class URDFLogger:
         link_names = self.urdf.get_chain(root_name, joint.child)[0::2]  # skip the joints
         return "/".join(link_names)
 
-    def log(self) -> None:
+    def log(self, joint_angles: Optional[dict | list | tuple] = None) -> None:
+        """Log the URDF to Rerun using an optional set of joint angles.
+
+        joint_angles may be:
+        - None: all joints default to 0.0
+        - dict mapping joint name -> angle (radians for revolute/continuous, meters for prismatic)
+        - list/tuple/ndarray providing angles in the same order as ``self.urdf.joints``
+        """
+        # Normalize joint_angles into a name->float map
+        if joint_angles is None:
+            joint_map = {}
+        elif isinstance(joint_angles, (list, tuple, np.ndarray)):
+            joint_map = {j.name: float(joint_angles[i]) if i < len(joint_angles) else 0.0 for i, j in enumerate(self.urdf.joints)}
+        elif isinstance(joint_angles, dict):
+            joint_map = {str(k): float(v) for k, v in joint_angles.items()}
+        else:
+            raise TypeError("joint_angles must be None, dict, or list/tuple/ndarray")
+
         rr.log(self.root_path + "", rr.ViewCoordinates.RIGHT_HAND_Z_UP, timeless=True)  # default ROS convention
 
         for joint in self.urdf.joints:
             entity_path = self.joint_entity_path(joint)
-            self.log_joint(entity_path, joint)
+            angle = float(joint_map.get(joint.name, 0.0))
+            self.log_joint(entity_path, joint, angle)
 
         for link in self.urdf.links:
             entity_path = self.link_entity_path(link)
@@ -54,14 +72,48 @@ class URDFLogger:
         for i, visual in enumerate(link.visuals):
             self.log_visual(entity_path + f"/visual_{i}", visual)
 
-    def log_joint(self, entity_path: str, joint: urdf_parser.Joint) -> None:
-        translation = rotation = None
+    def log_joint(self, entity_path: str, joint: urdf_parser.Joint, angle: float = 0.0) -> None:
+        """Log a joint transform, applying the provided joint angle.
+
+        For revolute/continuous joints the angle is interpreted as radians and a rotation
+        about the joint axis is applied. For prismatic joints the angle is interpreted
+        as a linear displacement along the joint axis (meters).
+        """
+        # Start from the joint origin (if present)
+        base_trans = np.zeros(3, dtype=float)
+        base_rot = np.eye(3, dtype=float)
 
         if joint.origin is not None and joint.origin.xyz is not None:
-            translation = joint.origin.xyz
+            base_trans = np.array(joint.origin.xyz, dtype=float)
 
         if joint.origin is not None and joint.origin.rpy is not None:
-            rotation = st.Rotation.from_euler("xyz", joint.origin.rpy).as_matrix()
+            base_rot = st.Rotation.from_euler("xyz", joint.origin.rpy).as_matrix()
+
+        transform = np.eye(4, dtype=float)
+        transform[:3, :3] = base_rot
+        transform[:3, 3] = base_trans
+
+        jtype = (joint.type or "").lower()
+
+        if jtype in ("revolute", "continuous"):
+            axis = np.array(joint.axis, dtype=float) if joint.axis is not None else np.array([1.0, 0.0, 0.0])
+            if np.linalg.norm(axis) == 0:
+                axis = np.array([1.0, 0.0, 0.0])
+            axis = axis / np.linalg.norm(axis)
+            # Rotation about axis by 'angle' radians
+            rot = st.Rotation.from_rotvec(angle * axis).as_matrix()
+            transform[:3, :3] = base_rot @ rot
+        elif jtype == "prismatic":
+            axis = np.array(joint.axis, dtype=float) if joint.axis is not None else np.array([1.0, 0.0, 0.0])
+            if np.linalg.norm(axis) == 0:
+                axis = np.array([1.0, 0.0, 0.0])
+            axis = axis / np.linalg.norm(axis)
+            # Translate along axis by 'angle' meters
+            transform[:3, 3] = base_trans + axis * angle
+            transform[:3, :3] = base_rot
+
+        translation = transform[:3, 3].tolist()
+        rotation = transform[:3, :3]
 
         self.entity_to_transform[self.root_path + entity_path] = (translation, rotation)
         rr.log(self.root_path + entity_path, rr.Transform3D(translation=translation, mat3x3=rotation))
@@ -138,17 +190,12 @@ def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
         if len(np.asarray(albedo_texture).shape) == 2:
             albedo_texture = np.stack([albedo_texture] * 3, axis=-1)
         vertex_texcoords = mesh.visual.uv
-        if vertex_texcoords is None:
-            pass
-        else:
+        if vertex_texcoords is not None:
             vertex_texcoords[:, 1] = 1.0 - vertex_texcoords[:, 1]
     else:
         try:
             colors = mesh.visual.to_color().vertex_colors
-            if len(colors) == 4:
-                mesh_material = Material(albedo_factor=np.array(colors))
-            else:
-                vertex_colors = colors
+            vertex_colors = colors
         except Exception:
             pass
     
