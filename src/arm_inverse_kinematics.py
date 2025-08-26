@@ -1,3 +1,4 @@
+import time
 import numpy as np
 from util import fast_mat_inv
 import ikpy.chain
@@ -31,26 +32,26 @@ class IKSolver:
                 k.name: 0 for k in self.robot.actuated_joints[1::2]
             }
         def residuals(joint_angles):
-            config_base.update({
+            config_update = {
                 k.name: joint_angles[i] for i, k in enumerate(self.robot.actuated_joints[::2])
-            })
+            }
+            config_base.update(config_update)
             self.robot.update_cfg(config_base)
             ee_position = self.robot.get_transform(frame_name, "base")
             return ee_position[:3, 3] - target_position
         
-        # jac_sparsity_mat = np.zeros((1, len(self.robot.actuated_joints)//2))
-        # jac_sparsity_mat[0,0] = 1
-        # jac_sparsity_mat[0,2] = 1
-        # jac_sparsity_mat[0,4] = 1
-        # jac_sparsity_mat[0,6] = 1
+        jac_sparsity_mat = np.zeros((1, len(self.robot.actuated_joints)//2))
+        jac_sparsity_mat[0,0] = 1
+        jac_sparsity_mat[0,1] = 1
+        jac_sparsity_mat[0,2] = 1
+        jac_sparsity_mat[0,3] = 1
 
         SOLVE_WITH_BOUNDS = True
         result = least_squares(
             residuals, 
             self.last_guess, 
             bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf), 
-            max_nfev=10000
-            # jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
+            jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
             # ftol=1e-5,
             # gtol = 1e-5,
             # xtol=1e-5
@@ -196,7 +197,7 @@ for i in range(mjx_model.njnt):
 
 
 # Create instance of the problem
-problem = Problem(mjx_model)
+problem = Problem(mjx_model, v_min=np.concatenate([-1000*np.ones(5), np.zeros(5)]), v_max=np.concatenate([1000*np.ones(5), np.zeros(5)]))
 
 # Add tasks to track desired behavior
 frame_task = FrameTask("ee_task", cost=1, gain=20, obj_name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop",
@@ -204,17 +205,18 @@ frame_task = FrameTask("ee_task", cost=1, gain=20, obj_name="KB_C_501X_Right_Bay
 
 problem.add_component(frame_task)
 
-joints_barrier = JointBarrier("jnt_range", gain=10)
+joints_barrier = JointBarrier("jnt_range", gain=10, mask=np.array([*np.ones(5), *np.zeros(5)]))
 problem.add_component(joints_barrier)
 
 # Initialize the solver
 local_solver = LocalIKSolver(mjx_model)
-global_solver = GlobalIKSolver(mjx_model, adam(learning_rate=1e-2), dt=1e-2)
+dt = 1e-1
+global_solver = GlobalIKSolver(mjx_model, adam(learning_rate=1), dt=1)
 
 # Initializing initial condition
-q = np.zeros(10)
 
 # Initialize solver data
+q = np.zeros(10)
 solver_data = global_solver.init(q)
 
 # jit-compiling solve and integrate 
@@ -222,13 +224,16 @@ solver_data = global_solver.init(q)
 global_solve_jit = jax.jit(global_solver.solve)
 solve_jit = jax.jit(local_solver.solve)
 
-dt = 1e-2
+
+for _ in range(10):
+    frame_task.target_frame = np.array([*np.random.random(3), *np.eye(4)[0]])
+    _ = global_solve_jit(q, solver_data, problem.compile())
 
 def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
     global solver_data, q
     # Changing problem and compiling it
-    rotvec = Rotation.from_matrix(right_wrist_mat[:3, :3]).as_quat(scalar_first=True)
-    frame_task.target_frame = np.concatenate([right_wrist_mat[:3, 3], rotvec])
+    quat = Rotation.from_matrix(right_wrist_mat[:3, :3]).as_quat(scalar_first=True)
+    frame_task.target_frame = np.concatenate([right_wrist_mat[:3, 3], quat])
     problem_data = problem.compile()
 
     # Solving the instance of the problem
