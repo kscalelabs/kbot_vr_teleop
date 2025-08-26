@@ -1,0 +1,195 @@
+<mujoco model="kbotv2p0_nohands">
+  <default>
+    <default class="robot">
+      <default class="robstride_04">
+        <joint armature="0.04" frictionloss="0.2" actuatorfrcrange="-120.0 120.0" />
+        <motor ctrlrange="-120.0 120.0" />
+      </default>
+      <default class="robstride_02">
+        <joint armature="0.0042" frictionloss="0.1" actuatorfrcrange="-17.0 17.0" />
+        <motor ctrlrange="-17.0 17.0" />
+      </default>
+      <default class="robstride_03">
+        <joint armature="0.02" frictionloss="0.2" actuatorfrcrange="-60.0 60.0" />
+        <motor ctrlrange="-60.0 60.0" />
+      </default>
+      <default class="robstride_00">
+        <joint armature="0.001" frictionloss="0.1" actuatorfrcrange="-14.0 14.0" />
+        <motor ctrlrange="-14.0 14.0" />
+      </default>
+      <default class="visual">
+        <geom material="visualgeom" contype="0" conaffinity="0" group="2" />
+      </default>
+      <default class="collision">
+        <geom material="collision_material" condim="3" contype="0" conaffinity="1" priority="1"
+          group="1" solref="0.005 1" friction="0.64" />
+        <equality solimp="0.99 0.999 1e-05" solref="0.005 1" />
+      </default>
+    </default>
+    <mesh maxhullvert="64" />
+  </default>
+
+  <compiler angle="radian" />
+
+  <asset>
+    <material name="base_material" rgba="1 0 0 1" />
+    <material name="Torso_Side_Right_material" rgba="0.098039 0.098039 0.098039 1" />
+    <material name="imu_material" rgba="0.615686 0.811765 0.929412 1" />
+    <material name="default_material" rgba="0.7 0.7 0.7 1" />
+    <material name="collision_material" rgba="1.0 0.28 0.1 0.9" />
+    <mesh name="Torso_Side_Right.stl" file="meshes/Torso_Side_Right.stl" />
+    <mesh name="KC_C_104R_PitchHardstopDriven.stl" file="meshes/KC_C_104R_PitchHardstopDriven.stl" />
+    <mesh name="RS03_3.stl" file="meshes/RS03_3.stl" />
+    <mesh name="KC_C_202R.stl" file="meshes/KC_C_202R.stl" />
+    <mesh name="KC_C_401R_R_UpForearmDrive.stl" file="meshes/KC_C_401R_R_UpForearmDrive.stl" />
+    <mesh name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop.stl"
+      file="meshes/KB_C_501X_Right_Bayonet_Adapter_Hard_Stop.stl" />
+    <mesh name="imu.stl" file="meshes/imu.stl" />
+    <mesh name="KC_C_104L_PitchHardstopDriven.stl" file="meshes/KC_C_104L_PitchHardstopDriven.stl" />
+    <mesh name="RS03_6.stl" file="meshes/RS03_6.stl" />
+    <mesh name="KC_C_202L.stl" file="meshes/KC_C_202L.stl" />
+    <mesh name="KC_C_401L_L_UpForearmDrive.stl" file="meshes/KC_C_401L_L_UpForearmDrive.stl" />
+    <mesh name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop.stl"
+      file="meshes/KB_C_501X_Left_Bayonet_Adapter_Hard_Stop.stl" />
+    <mesh name="RS03_4.stl" file="meshes/RS03_4.stl" />
+    <mesh name="RS03_5.stl" file="meshes/RS03_5.stl" />
+  </asset>
+
+  <worldbody>
+    <body name="Torso_Side_Right" pos="0 -0.095 0"
+      quat="0.7071054825112363 0.0 0.0 0.7071080798594735">
+      <inertial pos="0.093177 -0.000920 -0.063462" quat="1.0 0.0 0.0 0.0" mass="13.504988"
+        diaginertia="0.485847 0.512347 0.0592" />
+      <geom name="Torso_Side_Right_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+        material="Torso_Side_Right_material" type="mesh" mesh="Torso_Side_Right.stl"
+        class="visual" />
+      <body name="KC_C_104R_PitchHardstopDriven" pos="-0.028031 0.000007 0.126021"
+        quat="0.5000001633974483 0.4999999999999733 0.49999983660255165 0.4999999999999733">
+        <joint name="dof_right_shoulder_pitch_03" type="hinge" ref="0.0" class="robstride_03"
+          range="-3.141593 1.396263" axis="0 0 1" />
+        <inertial pos="-0.004584 0.002745 -0.051222" quat="1.0 0.0 0.0 0.0" mass="0.584848"
+          diaginertia="0.001182 0.001537 0.001416" />
+        <geom name="KC_C_104R_PitchHardstopDriven_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+          material="Torso_Side_Right_material" type="mesh"
+          mesh="KC_C_104R_PitchHardstopDriven.stl" class="visual" />
+        <body name="RS03_3" pos="-0.024250 0 -0.080000"
+          quat="-1.2247452309842457e-07 -0.7071068967259713 1.22474483074382e-07 -0.7071066656470838">
+          <joint name="dof_right_shoulder_roll_03" type="hinge" ref="0.0" class="robstride_03"
+            range="-1.658063 0.349066" axis="0 0 -1" />
+          <inertial pos="-0.004944 0.042532 0.027432" quat="1.0 0.0 0.0 0.0" mass="1.676509"
+            diaginertia="0.006831 0.001755 0.007324" />
+          <geom name="RS03_3_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+            material="Torso_Side_Right_material" type="mesh" mesh="RS03_3.stl" class="visual" />
+          <body name="KC_C_202R" pos="-0.013000 0.142000 0.030250"
+            quat="0.7071068967259818 0.7071066656470943 0.0 0.0">
+            <joint name="dof_right_shoulder_yaw_02" type="hinge" ref="0.0" class="robstride_02"
+              range="-1.658063 1.658063" axis="0 0 1" />
+            <inertial pos="0.003910 -0.004160 -0.101316" quat="1.0 0.0 0.0 0.0" mass="0.743508"
+              diaginertia="0.00241 0.002208 0.000693" />
+            <geom name="KC_C_202R_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+              material="Torso_Side_Right_material" type="mesh" mesh="KC_C_202R.stl" class="visual" />
+            <body name="KC_C_401R_R_UpForearmDrive" pos="0.018500 -0.010000 -0.137000"
+              quat="0.7071068967259818 0.0 0.7071066656470943 0.0">
+              <joint name="dof_right_elbow_02" type="hinge" ref="0.0" class="robstride_02"
+                range="0 2.478368" axis="0 0 -1" />
+              <inertial pos="0.061999 0.015867 -0.012446" quat="1.0 0.0 0.0 0.0" mass="0.585204"
+                diaginertia="0.000522 0.001021 0.00102" />
+              <geom name="KC_C_401R_R_UpForearmDrive_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+                material="Torso_Side_Right_material" type="mesh"
+                mesh="KC_C_401R_R_UpForearmDrive.stl" class="visual" />
+              <body name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop"
+                pos="0.103000 0.017350 -0.018000"
+                quat="0.7071068967259818 0.0 -0.7071066656470943 0.0">
+                <joint name="dof_right_wrist_00" type="hinge" ref="0.0" class="robstride_00"
+                  range="-1.745329 1.745329" axis="0 0 1" />
+                <inertial pos="0.004187 0.000068 -0.019905" quat="1.0 0.0 0.0 0.0" mass="0.152198"
+                  diaginertia="6.1e-05 6.1e-05 8.4e-05" />
+                <geom name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop_visual" pos="0 0 0"
+                  quat="1.0 0.0 0.0 0.0" material="Torso_Side_Right_material" type="mesh"
+                  mesh="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop.stl" class="visual" />
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+      <body name="imu" pos="0.121783 0.043292 0.231518"
+        quat="0.7071067715114185 8.22589334037449e-07 0.7071067908607194 8.22589334037449e-07">
+        <inertial pos="0.014737 -0.012000 0.003000" quat="1.0 0.0 0.0 0.0" mass="0.005700"
+          diaginertia="1e-06 1e-06 2e-06" />
+        <geom name="imu_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0" material="imu_material"
+          type="mesh" mesh="imu.stl" class="visual" />
+        <site name="imu_site" quat="1.0 0.0 0.0 0.0" pos="0.0 0.0 0.0" />
+      </body>
+      <body name="KC_C_104L_PitchHardstopDriven" pos="0.213969 0.000007 0.126021"
+        quat="0.5000001633974483 -0.4999999999999733 -0.49999983660255165 0.4999999999999733">
+        <joint name="dof_left_shoulder_pitch_03" type="hinge" ref="0.0" class="robstride_03"
+          range="-1.396263 3.141593" axis="0 0 1" />
+        <inertial pos="-0.004595 -0.002745 -0.051222" quat="1.0 0.0 0.0 0.0" mass="0.584843"
+          diaginertia="0.001182 0.001536 0.001415" />
+        <geom name="KC_C_104L_PitchHardstopDriven_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+          material="Torso_Side_Right_material" type="mesh"
+          mesh="KC_C_104L_PitchHardstopDriven.stl" class="visual" />
+        <body name="RS03_6" pos="-0.024250 0 -0.080000"
+          quat="-1.2247452309842457e-07 -0.7071068967259713 -1.22474483074382e-07 0.7071066656470838">
+          <joint name="dof_left_shoulder_roll_03" type="hinge" ref="0.0" class="robstride_03"
+            range="-0.349066 1.658063" axis="0 0 1" />
+          <inertial pos="0.004944 -0.042531 -0.027433" quat="1.0 0.0 0.0 0.0" mass="1.676479"
+            diaginertia="0.00683 0.001755 0.007324" />
+          <geom name="RS03_6_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+            material="Torso_Side_Right_material" type="mesh" mesh="RS03_6.stl" class="visual" />
+          <body name="KC_C_202L" pos="0.013000 -0.142000 -0.030250"
+            quat="0.7071068967259818 0.7071066656470943 0.0 0.0">
+            <joint name="dof_left_shoulder_yaw_02" type="hinge" ref="0.0" class="robstride_02"
+              range="-1.658063 1.658063" axis="0 0 -1" />
+            <inertial pos="0.000925 0.006010 0.113327" quat="1.0 0.0 0.0 0.0" mass="0.579259"
+              diaginertia="0.001537 0.001383 0.000471" />
+            <geom name="KC_C_202L_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+              material="Torso_Side_Right_material" type="mesh" mesh="KC_C_202L.stl" class="visual" />
+            <body name="KC_C_401L_L_UpForearmDrive" pos="-0.018500 0.010000 0.137000"
+              quat="-1.2247452309842457e-07 -0.7071068967259713 -1.22474483074382e-07 0.7071066656470838">
+              <joint name="dof_left_elbow_02" type="hinge" ref="0.0" class="robstride_02"
+                range="-2.478368 0" axis="0 0 -1" />
+              <inertial pos="-0.061998 0.015867 -0.012446" quat="1.0 0.0 0.0 0.0" mass="0.585219"
+                diaginertia="0.000522 0.001021 0.00102" />
+              <geom name="KC_C_401L_L_UpForearmDrive_visual" pos="0 0 0" quat="1.0 0.0 0.0 0.0"
+                material="Torso_Side_Right_material" type="mesh"
+                mesh="KC_C_401L_L_UpForearmDrive.stl" class="visual" />
+              <body name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop"
+                pos="-0.103000 0.017350 -0.018000"
+                quat="-1.2247452309842457e-07 -0.7071068967259713 -1.22474483074382e-07 0.7071066656470838">
+                <joint name="dof_left_wrist_00" type="hinge" ref="0.0" class="robstride_00"
+                  range="-1.745329 1.745329" axis="0 0 -1" />
+                <inertial pos="-0.004187 -0.000068 0.019905" quat="1.0 0.0 0.0 0.0"
+                  mass="0.152198" diaginertia="6.1e-05 6.1e-05 8.4e-05" />
+                <geom name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop_visual" pos="0 0 0"
+                  quat="1.0 0.0 0.0 0.0" material="Torso_Side_Right_material" type="mesh"
+                  mesh="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop.stl" class="visual" />
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="dof_right_shoulder_pitch_03_ctrl" joint="dof_right_shoulder_pitch_03"
+      class="robstride_03" />
+    <motor name="dof_right_shoulder_roll_03_ctrl" joint="dof_right_shoulder_roll_03"
+      class="robstride_03" />
+    <motor name="dof_right_shoulder_yaw_02_ctrl" joint="dof_right_shoulder_yaw_02"
+      class="robstride_02" />
+    <motor name="dof_right_elbow_02_ctrl" joint="dof_right_elbow_02" class="robstride_02" />
+    <motor name="dof_right_wrist_00_ctrl" joint="dof_right_wrist_00" class="robstride_00" />
+    <motor name="dof_left_shoulder_pitch_03_ctrl" joint="dof_left_shoulder_pitch_03"
+      class="robstride_03" />
+    <motor name="dof_left_shoulder_roll_03_ctrl" joint="dof_left_shoulder_roll_03"
+      class="robstride_03" />
+    <motor name="dof_left_shoulder_yaw_02_ctrl" joint="dof_left_shoulder_yaw_02"
+      class="robstride_02" />
+    <motor name="dof_left_elbow_02_ctrl" joint="dof_left_elbow_02" class="robstride_02" />
+    <motor name="dof_left_wrist_00_ctrl" joint="dof_left_wrist_00" class="robstride_00" />
+  </actuator>
+
+
+</mujoco>

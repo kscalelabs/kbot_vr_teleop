@@ -1,0 +1,263 @@
+<?xml version="1.0" ?>
+<robot name="kbotv2p0_nohands">
+  <link name="base">
+    <visual name="base_visual">
+      <geometry name="base_geometry">
+        <sphere radius="0.01"/>
+      </geometry>
+      <material name="base_material">
+        <color rgba="1 0 0 1"/>
+      </material>
+      <origin xyz="0 -0.095 0" rpy="0 0 1.5708"/>
+    </visual>
+    <inertial name="base_inertial">
+      <mass value="0.001"/>
+      <inertia ixx="0.000001" iyy="0.000001" izz="0.000001" ixy="0" ixz="0" iyz="0"/>
+      <origin xyz="0 -0.095 0" rpy="0 0 1.5708"/>
+    </inertial>
+  </link>
+  <joint name="base_joint" type="fixed">
+    <parent link="base"/>
+    <child link="Torso_Side_Right"/>
+    <origin xyz="0 -0.095 0" rpy="0 0 1.5708"/>
+  </joint>
+  <joint name="base_joint_left" type="fixed">
+    <parent link="base"/>
+    <child link="Torso_Side_Left"/>
+    <origin xyz="0 -0.095 0" rpy="0 0 1.5708"/>
+  </joint>
+  <joint name="dof_right_shoulder_pitch_03" type="revolute">
+    <origin xyz="-0.028031 0.000007 0.126021" rpy="1.570796 0 1.570796"/>
+    <parent link="Torso_Side_Right"/>
+    <child link="KC_C_104R_PitchHardstopDriven"/>
+    <limit effort="60" velocity="18.849" lower="-3.141593" upper="1.396263"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <joint name="dof_left_shoulder_pitch_03" type="revolute">
+    <origin xyz="0.213969 0.000007 0.126021" rpy="-1.570796 0 1.570796"/>
+    <parent link="Torso_Side_Left"/>
+    <child link="KC_C_104L_PitchHardstopDriven"/>
+    <limit effort="60" velocity="18.849" lower="-1.396263" upper="3.141593"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <joint name="dof_right_shoulder_roll_03" type="revolute">
+    <origin xyz="-0.024250 0 -0.080000" rpy="-3.141593 -1.570796 0"/>
+    <parent link="KC_C_104R_PitchHardstopDriven"/>
+    <child link="RS03_3"/>
+    <limit effort="60" velocity="18.849" lower="-1.658063" upper="0.349066"/>
+    <axis xyz="0 0 -1"/>
+  </joint>
+  <joint name="dof_left_shoulder_roll_03" type="revolute">
+    <origin xyz="-0.024250 0 -0.080000" rpy="-3.141593 1.570796 0"/>
+    <parent link="KC_C_104L_PitchHardstopDriven"/>
+    <child link="RS03_6"/>
+    <limit effort="60" velocity="18.849" lower="-0.349066" upper="1.658063"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <joint name="dof_right_shoulder_yaw_02" type="revolute">
+    <origin xyz="-0.013000 0.142000 0.030250" rpy="1.570796 0 0"/>
+    <parent link="RS03_3"/>
+    <child link="KC_C_202R"/>
+    <limit effort="17" velocity="37.699" lower="-1.658063" upper="1.658063"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <joint name="dof_left_shoulder_yaw_02" type="revolute">
+    <origin xyz="0.013000 -0.142000 -0.030250" rpy="1.570796 0 0"/>
+    <parent link="RS03_6"/>
+    <child link="KC_C_202L"/>
+    <limit effort="17" velocity="37.699" lower="-1.658063" upper="1.658063"/>
+    <axis xyz="0 0 -1"/>
+  </joint>
+  <joint name="dof_right_elbow_02" type="revolute">
+    <origin xyz="0.018500 -0.010000 -0.137000" rpy="0 1.570796 0"/>
+    <parent link="KC_C_202R"/>
+    <child link="KC_C_401R_R_UpForearmDrive"/>
+    <limit effort="17" velocity="37.699" lower="0" upper="2.478368"/>
+    <axis xyz="0 0 -1"/>
+  </joint>
+  <joint name="dof_left_elbow_02" type="revolute">
+    <origin xyz="-0.018500 0.010000 0.137000" rpy="-3.141593 1.570796 0"/>
+    <parent link="KC_C_202L"/>
+    <child link="KC_C_401L_L_UpForearmDrive"/>
+    <limit effort="17" velocity="37.699" lower="-2.478368" upper="0"/>
+    <axis xyz="0 0 -1"/>
+  </joint>
+  <joint name="dof_right_wrist_00" type="revolute">
+    <origin xyz="0.103000 0.017350 -0.018000" rpy="0 -1.570796 0"/>
+    <parent link="KC_C_401R_R_UpForearmDrive"/>
+    <child link="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop"/>
+    <limit effort="14" velocity="27.227" lower="-1.745329" upper="1.745329"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+  <joint name="dof_left_wrist_00" type="revolute">
+    <origin xyz="-0.103000 0.017350 -0.018000" rpy="-3.141593 1.570796 0"/>
+    <parent link="KC_C_401L_L_UpForearmDrive"/>
+    <child link="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop"/>
+    <limit effort="14" velocity="27.227" lower="-1.745329" upper="1.745329"/>
+    <axis xyz="0 0 -1"/>
+  </joint>
+  <link name="Torso_Side_Right">
+  </link>
+  <link name="Torso_Side_Left">
+  </link>
+  <link name="KC_C_104R_PitchHardstopDriven">
+    <visual name="KC_C_104R_PitchHardstopDriven_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KC_C_104R_PitchHardstopDriven_geometry">
+        <mesh filename="meshes/KC_C_104R_PitchHardstopDriven.stl"/>
+      </geometry>
+      <material name="KC_C_104R_PitchHardstopDriven_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KC_C_104R_PitchHardstopDriven_inertial">
+      <mass value="0.584848"/>
+      <inertia ixx="0.001182" iyy="0.001537" izz="0.001416" ixy="-0.000003" ixz="-0.000067" iyz="-0.000002"/>
+      <origin xyz="-0.004584 0.002745 -0.051222" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KC_C_104L_PitchHardstopDriven">
+    <visual name="KC_C_104L_PitchHardstopDriven_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KC_C_104L_PitchHardstopDriven_geometry">
+        <mesh filename="meshes/KC_C_104L_PitchHardstopDriven.stl"/>
+      </geometry>
+      <material name="KC_C_104L_PitchHardstopDriven_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KC_C_104L_PitchHardstopDriven_inertial">
+      <mass value="0.584843"/>
+      <inertia ixx="0.001182" iyy="0.001536" izz="0.001415" ixy="0.000003" ixz="-0.000067" iyz="0.000002"/>
+      <origin xyz="-0.004595 -0.002745 -0.051222" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="RS03_3">
+    <visual name="RS03_visual_3">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="RS03_geometry_3">
+        <mesh filename="meshes/RS03_3.stl"/>
+      </geometry>
+      <material name="RS03_material_3">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="RS03_inertial_3">
+      <mass value="1.676509"/>
+      <inertia ixx="0.006831" iyy="0.001755" izz="0.007324" ixy="0.000582" ixz="0" iyz="-0.000061"/>
+      <origin xyz="-0.004944 0.042532 0.027432" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="RS03_6">
+    <visual name="RS03_visual_6">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="RS03_geometry_6">
+        <mesh filename="meshes/RS03_6.stl"/>
+      </geometry>
+      <material name="RS03_material_6">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="RS03_inertial_6">
+      <mass value="1.676479"/>
+      <inertia ixx="0.006830" iyy="0.001755" izz="0.007324" ixy="0.000582" ixz="0" iyz="-0.000061"/>
+      <origin xyz="0.004944 -0.042531 -0.027433" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KC_C_202R">
+    <visual name="KC_C_202R_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KC_C_202R_geometry">
+        <mesh filename="meshes/KC_C_202R.stl"/>
+      </geometry>
+      <material name="KC_C_202R_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KC_C_202R_inertial">
+      <mass value="0.743508"/>
+      <inertia ixx="0.002410" iyy="0.002208" izz="0.000693" ixy="-0.000030" ixz="-0.000203" iyz="-0.000143"/>
+      <origin xyz="0.003910 -0.004160 -0.101316" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KC_C_202L">
+    <visual name="KC_C_202L_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KC_C_202L_geometry">
+        <mesh filename="meshes/KC_C_202L.stl"/>
+      </geometry>
+      <material name="KC_C_202L_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KC_C_202L_inertial">
+      <mass value="0.579259"/>
+      <inertia ixx="0.001537" iyy="0.001383" izz="0.000471" ixy="-0.000005" ixz="-0.000047" iyz="-0.000099"/>
+      <origin xyz="0.000925 0.006010 0.113327" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KC_C_401R_R_UpForearmDrive">
+    <visual name="KC_C_401R_R_UpForearmDrive_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KC_C_401R_R_UpForearmDrive_geometry">
+        <mesh filename="meshes/KC_C_401R_R_UpForearmDrive.stl"/>
+      </geometry>
+      <material name="KC_C_401R_R_UpForearmDrive_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KC_C_401R_R_UpForearmDrive_inertial">
+      <mass value="0.585204"/>
+      <inertia ixx="0.000522" iyy="0.001021" izz="0.001020" ixy="-0.000047" ixz="0.000102" iyz="0.000017"/>
+      <origin xyz="0.061999 0.015867 -0.012446" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KC_C_401L_L_UpForearmDrive">
+    <visual name="KC_C_401L_L_UpForearmDrive_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KC_C_401L_L_UpForearmDrive_geometry">
+        <mesh filename="meshes/KC_C_401L_L_UpForearmDrive.stl"/>
+      </geometry>
+      <material name="KC_C_401L_L_UpForearmDrive_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KC_C_401L_L_UpForearmDrive_inertial">
+      <mass value="0.585219"/>
+      <inertia ixx="0.000522" iyy="0.001021" izz="0.001020" ixy="0.000047" ixz="-0.000102" iyz="0.000017"/>
+      <origin xyz="-0.061998 0.015867 -0.012446" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop">
+    <visual name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop_geometry">
+        <mesh filename="meshes/KB_C_501X_Right_Bayonet_Adapter_Hard_Stop.stl"/>
+      </geometry>
+      <material name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop_inertial">
+      <mass value="0.152198"/>
+      <inertia ixx="0.000061" iyy="0.000061" izz="0.000084" ixy="0" ixz="0" iyz="0"/>
+      <origin xyz="0.004187 0.000068 -0.019905" rpy="0 0 0"/>
+    </inertial>
+  </link>
+  <link name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop">
+    <visual name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop_visual">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop_geometry">
+        <mesh filename="meshes/KB_C_501X_Left_Bayonet_Adapter_Hard_Stop.stl"/>
+      </geometry>
+      <material name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop_material">
+        <color rgba="0.098039 0.098039 0.098039 1"/>
+      </material>
+    </visual>
+    <inertial name="KB_C_501X_Left_Bayonet_Adapter_Hard_Stop_inertial">
+      <mass value="0.152198"/>
+      <inertia ixx="0.000061" iyy="0.000061" izz="0.000084" ixy="0" ixz="0" iyz="0"/>
+      <origin xyz="-0.004187 -0.000068 0.019905" rpy="0 0 0"/>
+    </inertial>
+  </link>
+</robot>
