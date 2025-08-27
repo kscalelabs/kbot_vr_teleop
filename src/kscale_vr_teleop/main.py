@@ -12,8 +12,11 @@ from scipy.spatial.transform import Rotation
 import time
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 
+SEND_EE_CONTROL = False
+UDP_HOST = "127.0.0.1"  # change if needed
 
 urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
+
 import rerun as rr
 
 rr.init("vr_teleop", spawn=True)
@@ -32,8 +35,6 @@ hand_vuer_to_urdf_frame[:3,:3] = np.array([
     [0, 0, 1],
     [1, 0, 0]
 ], dtype=np.float32)
-UDP_HOST = "127.0.0.1"  # change if needed
-UDP_PORT = 8888
 
 cam_mat = np.array([[266.61728276,0.,643.83126137],[0.,266.94450686,494.81811813],[0.,0.,1.,]])
 dist_coeffs = np.array([[-6.07417419e-02,9.95447444e-02,-2.26448001e-04,1.22881804e-03,3.42134205e-03,1.45361886e-01,8.03248099e-02,2.11170107e-02,-3.80620047e-03,2.48350591e-05,-8.33565666e-04,2.97806723e-05]])
@@ -44,7 +45,10 @@ left_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
 right_wrist_pose = np.zeros((4, 4), dtype=np.float32)
 left_wrist_pose = np.zeros((4, 4), dtype=np.float32)
 wrist_index = 0
-udp_handler = UDPHandler(UDP_HOST, UDP_PORT)
+if SEND_EE_CONTROL:
+    udp_handler = RLUDPHandler(UDP_HOST)
+else:
+    udp_handler = UDPHandler(UDP_HOST, 8888)
 
 left_arm_joints = np.zeros(5)
 right_arm_joints = np.zeros(5)
@@ -64,9 +68,16 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
     
     while True:
-        left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, base_to_head_transform @ left_wrist_pose, base_to_head_transform @ right_wrist_pose)
+        hand_target_left = base_to_head_transform @ left_wrist_pose
+        hand_target_right = base_to_head_transform @ right_wrist_pose
+        rr.log('hand_target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.05))
+        rr.log('hand_target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.05))
+        left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, hand_target_left, hand_target_right)
         left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
-        udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
+        if SEND_EE_CONTROL:
+            udp_handler._send_udp(hand_target_left, hand_target_right)
+        else:
+            udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
 
         new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
         new_config.update({k.name: 0 for i, k in enumerate(arms_robot.actuated_joints[1::2])})
