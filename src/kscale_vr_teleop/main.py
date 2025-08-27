@@ -6,11 +6,14 @@ import numpy as np
 from erics_cameras.libcamera_cam import LibCameraCam
 from kscale_vr_teleop.arm_inverse_kinematics import calculate_arm_joints, arms_robot, right_arm_links
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
-from kscale_vr_teleop.udp_conn import UDPHandler
+from kscale_vr_teleop.udp_conn import UDPHandler, RLUDPHandler
 from kscale_vr_teleop.util import fast_mat_inv
 from scipy.spatial.transform import Rotation
 import time
+from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 
+
+urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
 import rerun as rr
 
 rr.init("vr_teleop", spawn=True)
@@ -29,7 +32,7 @@ hand_vuer_to_urdf_frame[:3,:3] = np.array([
     [0, 0, 1],
     [1, 0, 0]
 ], dtype=np.float32)
-UDP_HOST = "10.33.13.62"  # change if needed
+UDP_HOST = "127.0.0.1"  # change if needed
 UDP_PORT = 8888
 
 cam_mat = np.array([[266.61728276,0.,643.83126137],[0.,266.94450686,494.81811813],[0.,0.,1.,]])
@@ -66,9 +69,9 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
 
         new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        arms_robot.update_cfg(new_config)
-        positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
-        rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
+        new_config.update({k.name: 0 for i, k in enumerate(arms_robot.actuated_joints[1::2])})
+
+        urdf_logger.log(new_config)
         if STREAM:
             ret_left, frame_left = cam_left.read()
             ret_right, frame_right = cam_right.read()

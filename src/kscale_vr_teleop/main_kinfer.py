@@ -10,6 +10,10 @@ from kscale_vr_teleop.udp_conn import RLUDPHandler
 from kscale_vr_teleop.util import fast_mat_inv
 from scipy.spatial.transform import Rotation
 import time
+from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
+
+
+urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
 
 import rerun as rr
 
@@ -65,9 +69,9 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         udp_handler._send_udp(base_to_head_transform @ left_wrist_pose, base_to_head_transform @ right_wrist_pose)
 
         new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        arms_robot.update_cfg(new_config)
-        positions = [arms_robot.get_transform(link, 'base')[:3,3] for link in right_arm_links]
-        rr.log('kinematic_chain', rr.LineStrips3D(positions, colors=[[255,255,255]]*(len(positions)-1), radii=0.005))
+        new_config.update({k.name: 0 for i, k in enumerate(arms_robot.actuated_joints[1::2])})
+
+        urdf_logger.log(new_config)
         if STREAM:
             ret_left, frame_left = cam_left.read()
             ret_right, frame_right = cam_right.read()
