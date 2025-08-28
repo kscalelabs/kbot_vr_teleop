@@ -30,7 +30,7 @@ class IKSolver:
             self.lower_bounds.append(joint.limit.lower)
             self.upper_bounds.append(joint.limit.upper)
 
-    def from_scratch_ik(self, target_position, frame_name, initial_guess = None): # This shouldn't be necessary but ikpy's inverse kinematics is ironically crap
+    def from_scratch_ik(self, target_mat, frame_name, initial_guess = None): # This shouldn't be necessary but ikpy's inverse kinematics is ironically crap
         config_base = {
                 k.name: 0 for k in self.robot.actuated_joints[1::2]
             }
@@ -41,8 +41,13 @@ class IKSolver:
             config_base.update(config_update)
             self.robot.update_cfg(config_base)
             ee_position = self.robot.get_transform(frame_name, "base")
-            return ee_position[:3, 3] - target_position
-        
+            ee_forward = ee_position[:3, 2]
+            target_forward = target_mat[:3, 2]
+            rotation_angle_off = np.arccos(np.dot(ee_forward, target_forward))
+            return np.concatenate([
+                ee_position[:3, 3] - target_mat[:3, 3],
+                [0.1*rotation_angle_off]
+            ])
         jac_sparsity_mat = np.zeros((1, len(self.robot.actuated_joints)//2))
         jac_sparsity_mat[0,0] = 1
         jac_sparsity_mat[0,1] = 1
@@ -54,7 +59,7 @@ class IKSolver:
             residuals, 
             self.last_guess, 
             bounds=(self.lower_bounds, self.upper_bounds) if SOLVE_WITH_BOUNDS else (-np.inf, np.inf), 
-            jac_sparsity=np.repeat(jac_sparsity_mat, 3, axis=0),
+            jac_sparsity=np.repeat(jac_sparsity_mat, 4, axis=0),
             xtol=1e-5,
             gtol=1e-5,
             ftol=1e-5,
@@ -96,7 +101,7 @@ if VISUALIZE:
 solver = IKSolver(arms_robot)
 
 def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_guess=None):
-    right_joint_angles = solver.from_scratch_ik(target_position=right_wrist_mat[:3,3], frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', initial_guess = initial_guess)
+    right_joint_angles = solver.from_scratch_ik(target_mat=right_wrist_mat, frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', initial_guess = initial_guess)
     new_config={
         k.name: right_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])
     }
