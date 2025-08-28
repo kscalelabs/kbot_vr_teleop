@@ -75,11 +75,6 @@ file_absolute_parent = Path(__file__).parent.absolute()
 
 urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
-right_chain = ikpy.chain.Chain.from_urdf_file(
-    urdf_path,
-    base_elements=['base'],  # Start from the torso and let ikpy auto-discover
-)
-
 def make_robot():
     return URDF.load(
             urdf_path,
@@ -111,90 +106,3 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_gues
         visualizer.update_config(new_config)
 
     return np.zeros(5), right_joint_angles
-
-def new_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
-    ik_solution = right_chain.inverse_kinematics(target_position = right_wrist_mat[:3, 3])
-
-    new_config={
-        k.name: ik_solution[1:-1][i//2] for i, k in enumerate(arms_robot.actuated_joints)
-    }
-    arms_robot.update_cfg(new_config)
-
-    return np.zeros(5), ik_solution
-
-
-import mujoco as mj
-from mujoco import mjx
-from mjinx.problem import Problem
-from mjinx.components.tasks import ComTask, FrameTask, JointTask
-from mjinx.solvers import LocalIKSolver, GlobalIKSolver
-from mjinx.components.barriers import JointBarrier
-import jax
-from optax import adam
-
-from mjinx.configuration import integrate
-
-integrate_jit = jax.jit(integrate, static_argnames=["dt"])
-
-# Initialize the robot model using MuJoCo
-MJCF_PATH  = str(ASSETS_DIR / "kbot" / "robot.mjcf")
-mj_model = mj.MjModel.from_xml_path(MJCF_PATH)
-mjx_model = mjx.put_model(mj_model)
-
-print(f"Model nq (positions): {mjx_model.nq}")
-print(f"Model nv (velocities): {mjx_model.nv}")
-print(f"Expected: 10 arm joints")
-
-# Print all joints that actually exist
-print("\nActual joints in model:")
-for i in range(mjx_model.njnt):
-    joint_name = mj.mj_id2name(mj_model, mj.mjtObj.mjOBJ_JOINT, i)
-    joint_type = mj_model.jnt_type[i]
-    joint_qpos_adr = mj_model.jnt_qposadr[i]
-    joint_dof_adr = mj_model.jnt_dofadr[i]
-    
-    type_names = {0: 'free', 1: 'ball', 2: 'slide', 3: 'hinge'}
-    type_name = type_names.get(joint_type, f'unknown({joint_type})')
-    
-    print(f"Joint {i}: '{joint_name}' type={type_name} qpos_adr={joint_qpos_adr} dof_adr={joint_dof_adr}")
-
-
-# Create instance of the problem
-problem = Problem(mjx_model, v_min=np.concatenate([-1000*np.ones(5), np.zeros(5)]), v_max=np.concatenate([1000*np.ones(5), np.zeros(5)]))
-
-# Add tasks to track desired behavior
-frame_task = FrameTask("ee_task", cost=1, gain=20, obj_name="KB_C_501X_Right_Bayonet_Adapter_Hard_Stop",
-                           mask=[1, 1, 1, 0, 0, 0, 0])  # position=[1,1,1], orientation=[0,0,0,0])
-
-problem.add_component(frame_task)
-
-joints_barrier = JointBarrier("jnt_range", gain=10, mask=np.array([*np.ones(5), *np.zeros(5)]))
-problem.add_component(joints_barrier)
-
-# Initialize the solver
-local_solver = LocalIKSolver(mjx_model)
-dt = 1e-1
-solver_data = local_solver.init()
-
-# jit-compiling solve and integrate 
-
-solve_jit = jax.jit(local_solver.solve)
-
-def jax_calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat):
-    global solver_data, q
-    quat = Rotation.from_matrix(right_wrist_mat[:3, :3]).as_quat(scalar_first=True)
-    frame_task.target_frame = np.concatenate([right_wrist_mat[:3, 3], quat])
-    problem_data = problem.compile()
-
-    opt_solution, solver_data = solve_jit(q, solver_data, problem_data)
-    q = integrate_jit(
-            mjx_model,
-            q,
-            velocity=opt_solution.v_opt,
-            dt=dt,
-        )
-    if np.any(np.isnan(q)):
-        print("NaN detected in q")
-        q = np.zeros(10)
-
-    return np.zeros(5), q[:5]
