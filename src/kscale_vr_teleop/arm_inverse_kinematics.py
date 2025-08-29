@@ -52,11 +52,11 @@ class IKSolver:
                 [0.1*rotation_angle_off, 0.1*y_angle_off]
             ])
         jac_sparsity_mat = np.zeros((5, len(self.robot.actuated_joints)//2))
-        jac_sparsity_mat[0:4,0] = 1
-        jac_sparsity_mat[0:4,1] = 1
-        jac_sparsity_mat[0:4,2] = 1
-        jac_sparsity_mat[0:4,3] = 1
-        jac_sparsity_mat[4,4] = 0
+        jac_sparsity_mat[:,0] = 1
+        jac_sparsity_mat[:,1] = 1
+        jac_sparsity_mat[:,2] = 1
+        jac_sparsity_mat[:,3] = 1
+        jac_sparsity_mat[4,4] = 1
 
         SOLVE_WITH_BOUNDS = True
         result = least_squares(
