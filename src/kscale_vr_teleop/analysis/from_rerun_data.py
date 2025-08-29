@@ -67,12 +67,12 @@ def main():
         if timestamp is None:
             timestamp = int(i)
 
-        _, old_arm_joint_angles = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
+        left_arm_joints, right_arm_joints = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
 
         rr.set_time_seconds('my_timeline', timestamp.timestamp())
 
-        new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        new_config.update({k.name: 0 for i, k in enumerate(arms_robot.actuated_joints[1::2])})
+        new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
+        new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[1::2])})
         arms_robot.update_cfg(new_config)
         old_fk_wrist_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
 
@@ -87,7 +87,7 @@ def main():
 
         urdf_logger.log(new_config)
 
-        udp_handler._send_udp(old_arm_joint_angles, np.zeros(5), np.zeros(6), np.zeros(6))
+        udp_handler._send_udp(right_arm_joints, left_arm_joints, np.zeros(6), np.zeros(6))
 
     print('Done')
     mse = np.mean(np.array(err)**2)

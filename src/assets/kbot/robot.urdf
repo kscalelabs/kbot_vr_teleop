@@ -37,7 +37,7 @@
     <origin xyz="0.213969 0.000007 0.126021" rpy="-1.570796 0 1.570796"/>
     <parent link="Torso_Side_Left"/>
     <child link="KC_C_104L_PitchHardstopDriven"/>
-    <limit effort="60" velocity="18.849" lower="-1.396263" upper="3.141593"/>
+    <limit effort="60" velocity="18.849" lower="-1.047" upper="3.49"/>
     <axis xyz="0 0 1"/>
   </joint>
   <joint name="dof_right_shoulder_roll_03" type="revolute">
@@ -51,7 +51,7 @@
     <origin xyz="-0.024250 0 -0.080000" rpy="-3.141593 1.570796 0"/>
     <parent link="KC_C_104L_PitchHardstopDriven"/>
     <child link="RS03_6"/>
-    <limit effort="60" velocity="18.849" lower="-0.349066" upper="1.658063"/>
+    <limit effort="60" velocity="18.849" lower="-0.436" upper="1.658063"/>
     <axis xyz="0 0 1"/>
   </joint>
   <joint name="dof_right_shoulder_yaw_02" type="revolute">
@@ -76,11 +76,11 @@
     <axis xyz="0 0 -1"/>
   </joint>
   <joint name="dof_left_elbow_02" type="revolute">
-    <origin xyz="-0.018500 0.010000 0.137000" rpy="-3.141593 1.570796 0"/>
+    <origin xyz="-0.018500 0.010000 0.137000" rpy="3.141593 1.570796 0"/>
     <parent link="KC_C_202L"/>
     <child link="KC_C_401L_L_UpForearmDrive"/>
     <limit effort="17" velocity="37.699" lower="-2.478368" upper="0"/>
-    <axis xyz="0 0 -1"/>
+    <axis xyz="0 0 1"/>
   </joint>
   <joint name="dof_right_wrist_00" type="revolute">
     <origin xyz="0.103000 0.017350 -0.018000" rpy="0 -1.570796 0"/>
