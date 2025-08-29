@@ -38,7 +38,7 @@
     <parent link="Torso_Side_Left"/>
     <child link="KC_C_104L_PitchHardstopDriven"/>
     <limit effort="60" velocity="18.849" lower="-1.047" upper="3.49"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
   </joint>
   <joint name="dof_right_shoulder_roll_03" type="revolute">
     <origin xyz="-0.024250 0 -0.080000" rpy="-3.141593 -1.570796 0"/>
