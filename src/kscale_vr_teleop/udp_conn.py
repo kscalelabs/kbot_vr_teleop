@@ -28,11 +28,11 @@ class UDPHandler:
         payload = {
             "timestamp": time.time(),
             "joints": {
-                "11": -left_arm_angles[0],
-                "12": left_arm_angles[1],
-                "13": left_arm_angles[2],
-                "14": left_arm_angles[3],
-                "15": left_arm_angles[4],
+                "11": np.rad2deg(left_arm_angles[0]),
+                "12": np.rad2deg(left_arm_angles[1]),
+                "13": np.rad2deg(left_arm_angles[2]),
+                "14": np.rad2deg(left_arm_angles[3]),
+                "15": np.rad2deg(left_arm_angles[4]),
                 "21": np.rad2deg(right_arm_angles[0]),
                 "22": np.rad2deg(right_arm_angles[1]),
                 "23": np.rad2deg(right_arm_angles[2]),

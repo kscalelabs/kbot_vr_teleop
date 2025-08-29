@@ -2,10 +2,11 @@ import rerun as rr
 import polars as pl
 import numpy as np
 from pathlib import Path
-from kscale_vr_teleop.arm_inverse_kinematics import new_calculate_arm_joints, calculate_arm_joints, arms_robot, right_chain, jax_calculate_arm_joints, right_arm_links
+from kscale_vr_teleop.arm_inverse_kinematics import calculate_arm_joints, arms_robot
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from tqdm import tqdm
 from line_profiler import profile
+from kscale_vr_teleop.udp_conn import UDPHandler, RLUDPHandler
 
 urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
 
@@ -43,6 +44,8 @@ rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), stat
 
 arms_robot.update_cfg({k.name: 0 for k in arms_robot.actuated_joints})
 
+udp_handler = UDPHandler("127.0.0.1", 8888)
+
 err = []
 @profile
 def main():
@@ -65,11 +68,8 @@ def main():
             timestamp = int(i)
 
         _, old_arm_joint_angles = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
-        _, arm_joint_angles = new_calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
 
         rr.set_time_seconds('my_timeline', timestamp.timestamp())
-
-        fk_wrist_position = right_chain.forward_kinematics(arm_joint_angles)[:3,3]
 
         new_config = {k.name: old_arm_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
         new_config.update({k.name: 0 for i, k in enumerate(arms_robot.actuated_joints[1::2])})
@@ -77,18 +77,17 @@ def main():
         old_fk_wrist_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'base')[:3,3]
 
         target_pos = frame_mat[:3,3]
-        res_new = float(np.linalg.norm(fk_wrist_position - target_pos))
         res_old = float(np.linalg.norm(old_fk_wrist_position - target_pos))
         err.append(res_old)
 
-        rr.log('residual_new', rr.Scalar(res_new))
         rr.log('residual_old', rr.Scalar(res_old))
 
-        rr.log('fk_position', rr.Points3D([fk_wrist_position], colors=[[255,0,0]], radii=0.01))
         rr.log('old_fk_position', rr.Points3D([old_fk_wrist_position], colors=[[0,0,255]], radii=0.01))
         rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))
 
         urdf_logger.log(new_config)
+
+        udp_handler._send_udp(old_arm_joint_angles, np.zeros(5), np.zeros(6), np.zeros(6))
 
     print('Done')
     mse = np.mean(np.array(err)**2)

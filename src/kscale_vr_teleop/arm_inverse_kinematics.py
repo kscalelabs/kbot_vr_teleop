@@ -97,12 +97,16 @@ solver = IKSolver(arms_robot)
 
 def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_guess=None):
     right_joint_angles = solver.from_scratch_ik(target_mat=right_wrist_mat, frame_name = 'KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', initial_guess = initial_guess)
+    left_joint_angles = solver.from_scratch_ik(target_mat=left_wrist_mat, frame_name = 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop', initial_guess = initial_guess)
     new_config={
         k.name: right_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[::2])
     }
+    new_config.update({
+        k.name: left_joint_angles[i] for i, k in enumerate(arms_robot.actuated_joints[1::2])
+    })
     arms_robot.update_cfg(new_config)
     if VISUALIZE:
         visualizer.update_marker('goal', right_wrist_mat[:3, 3], right_wrist_mat[:3, :3])
         visualizer.update_config(new_config)
 
-    return np.zeros(5), right_joint_angles
+    return left_joint_angles, right_joint_angles

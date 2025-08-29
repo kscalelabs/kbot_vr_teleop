@@ -53,7 +53,7 @@ else:
 left_arm_joints = np.zeros(5)
 right_arm_joints = np.zeros(5)
 
-STREAM = False
+STREAM = True
 
 base_to_head_transform = np.eye(4)
 base_to_head_transform[:3,3] = np.array([
@@ -62,10 +62,11 @@ base_to_head_transform[:3,3] = np.array([
 
 async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     if STREAM:
-        left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-        right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-        cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
-        cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+        # left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+        # right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+        # cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
+        # cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+        cam_left = cv2.VideoCapture('udp://@127.0.0.1:8554?buffer_size=65535&pkt_size=65535&fifo_size=65535')
     
     while True:
         hand_target_left = base_to_head_transform @ left_wrist_pose
@@ -80,14 +81,16 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
             udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
 
         new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        new_config.update({k.name: 0 for i, k in enumerate(arms_robot.actuated_joints[1::2])})
+        new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[1::2])})
 
         urdf_logger.log(new_config)
         if STREAM:
             ret_left, frame_left = cam_left.read()
-            ret_right, frame_right = cam_right.read()
-            if not ret_left or not ret_right:
+            if not ret_left:
                 continue
+            # ret_right, frame_right = cam_right.read()
+            # if not ret_left or not ret_right:
+            #     continue
             frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
             frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
             frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
