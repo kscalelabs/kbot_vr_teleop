@@ -62,11 +62,11 @@ base_to_head_transform[:3,3] = np.array([
 
 async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     if STREAM:
-        # left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-        # right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-        # cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
-        # cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
-        cam_left = cv2.VideoCapture('udp://@127.0.0.1:8554?buffer_size=65535&pkt_size=65535&fifo_size=65535')
+        left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+        right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+        cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
+        cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+        # cam_left = cv2.VideoCapture('udp://@127.0.0.1:8554?buffer_size=65535&pkt_size=65535&fifo_size=65535')
     
     while True:
         hand_target_left = base_to_head_transform @ left_wrist_pose
