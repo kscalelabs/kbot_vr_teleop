@@ -17,10 +17,19 @@ class RobotInverseKinematics:
         self.urdf: urdf_parser.Robot = urdf_parser.URDF.from_xml_string(urdf_contents)
 
         # build up kinematic chains as lists of joints
-        kinematic_chain_maps = {'base': []}
+        kinematic_chain_maps = {base_link_name: []}
         for link_name, child_info_list in self.urdf.child_map.items():
             for (joint_name, child_link_name) in child_info_list:
                 kinematic_chain_maps[child_link_name] = kinematic_chain_maps[link_name] + [joint_name]
+
+        self.active_joints = [
+            j for j in self.urdf.joints if j.joint_type != 'fixed'
+        ]
+
+        # Create mapping from joint name to active joint index
+        self.active_joint_indices = {}
+        for i, joint in enumerate(self.active_joints):
+            self.active_joint_indices[joint.name] = i
 
         def forward_kinematics(joint_angles):
             res = []
@@ -28,17 +37,16 @@ class RobotInverseKinematics:
                 mat = np.eye(4)
                 for joint_name in kinematic_chain_maps[ee_link_name]:
                     joint = self.urdf.joint_map[joint_name]
-                    joint_index = list(self.urdf.joint_map.keys()).index(joint_name)
-                    joint_mat = self.make_transform_mat(joint, joint_angles[joint_index])
+                    if joint.joint_type == 'fixed':
+                        joint_angle = 0.0
+                    else:
+                        joint_angle = joint_angles[self.active_joint_indices[joint_name]]
+                    joint_mat = self.make_transform_mat(joint, joint_angle)
                     mat = mat @ joint_mat
                 res.append(mat)
             return np.array(res)
 
         self.forward_kinematics = jax.jit(forward_kinematics)
-
-        self.active_joints = [
-            j for j in self.urdf.joints if j.joint_type != 'fixed'
-        ]
 
         upper_bounds = []
         lower_bounds = []
@@ -53,7 +61,7 @@ class RobotInverseKinematics:
         self.lower_bounds = np.array(lower_bounds)
         self.last_solution = np.zeros(len(self.active_joints))
         
-        # Pre-compile the residuals function and create the solver once
+                # Pre-compile the residuals function and create the solver once
         self._setup_ik_solver()
 
     @staticmethod
@@ -63,18 +71,30 @@ class RobotInverseKinematics:
         Only works for fixed and revolute joints currently
         '''
         origin_position = joint.origin.position
-        origin_rotation = Rotation.from_euler('XYZ', joint.origin.rotation) # TODO: verify the rotation assumption is correct
-        mat = np.eye(4)
-        mat = mat.at[:3,3].set(origin_position)
-        mat = mat.at[:3,:3].set(origin_rotation.as_matrix())
+        origin_rotation_rpy = joint.origin.rotation  # roll, pitch, yaw (X, Y, Z)
+        
+        # Translation matrix
+        T = np.eye(4)
+        T = T.at[:3, 3].set(origin_position)
+        
+        # Origin rotation matrix (fixed frame: roll around X, pitch around Y, yaw around Z)
+        R_origin = np.eye(4)
+        if joint.origin.rotation is not None:
+            rot_matrix = Rotation.from_euler('xyz', origin_rotation_rpy).as_matrix()
+            R_origin = R_origin.at[:3, :3].set(rot_matrix)
+        
         if joint.joint_type == 'fixed':
-            return mat
+            return T @ R_origin
         elif joint.joint_type == 'revolute':
+            # Joint rotation matrix
             rot_axis = np.array(joint.axis)
-            rot_mat = Rotation.from_rotvec(joint_angle * rot_axis).as_matrix()
-            rot_mat_4x4 = np.eye(4)
-            rot_mat_4x4 = rot_mat_4x4.at[:3,:3].set(rot_mat)
-            return rot_mat_4x4 @ mat
+            joint_rot_mat = Rotation.from_rotvec(joint_angle * rot_axis).as_matrix()
+            R_joint = np.eye(4)
+            R_joint = R_joint.at[:3, :3].set(joint_rot_mat)
+            
+            # Correct order from test_all_combinations.py: T @ R_origin @ R_joint (no transpose needed)
+            result = T @ R_origin @ R_joint
+            return result
         else:
             raise NotImplementedError(f"Joint type {joint.joint_type} not supported")
 
