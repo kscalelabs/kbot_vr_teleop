@@ -3,8 +3,6 @@ from pathlib import Path
 import jax
 import jax.numpy as np
 from jax.scipy.spatial.transform import Rotation
-# import numpy as np
-# from scipy.spatial.transform import Rotation
 import jaxopt
 from tqdm import tqdm
 
@@ -136,6 +134,8 @@ class RobotInverseKinematics:
             ])
         
         self.residuals = residuals
+        from jax.test_util import check_grads
+        check_grads(self.forward_kinematics, (self.last_solution,), order=2)
         
         # Setup Jacobian sparsity pattern
         jac_sparsity_mat = np.zeros((10, len(self.active_joints)))
