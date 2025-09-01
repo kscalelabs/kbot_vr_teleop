@@ -54,7 +54,7 @@ class RobotInverseKinematics:
         self.last_solution = np.zeros(len(self.active_joints))
         
         # Pre-compile the residuals function and create the solver once
-        self._setup_ik_solver(ee_links)
+        self._setup_ik_solver()
 
     @staticmethod
     def make_transform_mat(joint: urdf_parser.Joint, joint_angle: float) -> np.ndarray:
@@ -78,7 +78,7 @@ class RobotInverseKinematics:
         else:
             raise NotImplementedError(f"Joint type {joint.joint_type} not supported")
 
-    def _setup_ik_solver(self, ee_links: list[str]) -> None:
+    def _setup_ik_solver(self) -> None:
         """Setup the IK solver with pre-compiled residuals function"""
         
         @jax.jit
