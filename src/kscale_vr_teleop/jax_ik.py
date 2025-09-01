@@ -4,16 +4,57 @@ import jax
 import jax.numpy as np
 from jax.scipy.spatial.transform import Rotation
 import jaxopt
+from tqdm import tqdm
 
 from kscale_vr_teleop._assets import ASSETS_DIR
 
 
 class RobotInverseKinematics:
-    def __init__(self, filepath: str) -> None:
+    def __init__(self, filepath: str, ee_links: list[str], base_link_name: str) -> None:
         urdf_contents = open(filepath, 'r').read()
         urdf_parent_path =Path(filepath).absolute().parent
         urdf_contents = urdf_contents.replace('filename="', f'filename="{urdf_parent_path}/')
         self.urdf: urdf_parser.Robot = urdf_parser.URDF.from_xml_string(urdf_contents)
+
+        # build up kinematic chains as lists of joints
+        kinematic_chain_maps = {'base': []}
+        for link_name, child_info_list in self.urdf.child_map.items():
+            for (joint_name, child_link_name) in child_info_list:
+                kinematic_chain_maps[child_link_name] = kinematic_chain_maps[link_name] + [joint_name]
+
+        def forward_kinematics(joint_angles):
+            res = []
+            for ee_link_name in ee_links:
+                mat = np.eye(4)
+                for joint_name in kinematic_chain_maps[ee_link_name]:
+                    joint = self.urdf.joint_map[joint_name]
+                    joint_index = list(self.urdf.joint_map.keys()).index(joint_name)
+                    joint_mat = self.make_transform_mat(joint, joint_angles[joint_index])
+                    mat = mat @ joint_mat
+                res.append(mat)
+            return np.array(res)
+
+        self.forward_kinematics = jax.jit(forward_kinematics)
+
+        self.active_joints = [
+            j for j in self.urdf.joints if j.joint_type != 'fixed'
+        ]
+
+        upper_bounds = []
+        lower_bounds = []
+        for joint in self.urdf.joints:
+            if joint.joint_type == 'revolute':
+                upper_bounds.append(joint.limit.upper)
+                lower_bounds.append(joint.limit.lower)
+            # else:
+            #     upper_bounds.append(np.inf)
+            #     lower_bounds.append(-np.inf)
+        self.upper_bounds = np.array(upper_bounds)
+        self.lower_bounds = np.array(lower_bounds)
+        self.last_solution = np.zeros(len(self.active_joints))
+        
+        # Pre-compile the residuals function and create the solver once
+        self._setup_ik_solver(ee_links)
 
     @staticmethod
     def make_transform_mat(joint: urdf_parser.Joint, joint_angle: float) -> np.ndarray:
@@ -37,43 +78,81 @@ class RobotInverseKinematics:
         else:
             raise NotImplementedError(f"Joint type {joint.joint_type} not supported")
 
-    def inverse_kinematics(self, ee_links: list[str], transform_targets: np.ndarray):
+    def _setup_ik_solver(self, ee_links: list[str]) -> None:
+        """Setup the IK solver with pre-compiled residuals function"""
+        
+        @jax.jit
+        def residuals(joint_angle_vector, transform_targets):
+            end_effector_mats = self.forward_kinematics(joint_angle_vector)
+            right_ee_position = end_effector_mats[0]
+            left_ee_position = end_effector_mats[1]
+            right_wrist_mat = transform_targets[0]
+            left_wrist_mat = transform_targets[1]
+            right_ee_forward = -right_ee_position[:3,2]
+            left_ee_forward = left_ee_position[:3,2]
+            right_target_forward = -right_wrist_mat[:3, 2]
+            left_target_forward = -left_wrist_mat[:3, 2]
+            right_ee_up = -right_ee_position[:3, 1]
+            left_ee_up = left_ee_position[:3, 1]
+            right_target_up = right_wrist_mat[:3,1]
+            left_target_up = left_wrist_mat[:3,1]
+            
+            # Clamp dot products to avoid numerical issues with arccos
+            right_dot_forward = np.clip(np.dot(right_ee_forward, right_target_forward), -1.0, 1.0)
+            left_dot_forward = np.clip(np.dot(left_ee_forward, left_target_forward), -1.0, 1.0)
+            right_dot_up = np.clip(np.dot(right_ee_up, right_target_up), -1.0, 1.0)
+            left_dot_up = np.clip(np.dot(left_ee_up, left_target_up), -1.0, 1.0)
+            
+            right_rotation_angle_off = np.arccos(right_dot_forward)
+            left_rotation_angle_off = np.arccos(left_dot_forward)
+            right_y_angle_off = np.arccos(right_dot_up)
+            left_y_angle_off = np.arccos(left_dot_up)
+            
+            return np.concatenate([
+                right_ee_position[:3, 3] - right_wrist_mat[:3, 3],
+                left_ee_position[:3, 3] - left_wrist_mat[:3, 3],
+                np.array([0.1*right_rotation_angle_off, 0.1*right_y_angle_off, 0.1*left_rotation_angle_off, 0.1*left_y_angle_off])
+            ])
+        
+        self.residuals = residuals
+        
+        # Setup Jacobian sparsity pattern
+        jac_sparsity_mat = np.zeros((10, len(self.active_joints)))
+        # joints: evens are right, odds are left, order is shoulder to wrist
+        jac_sparsity_mat = jac_sparsity_mat.at[:3, :8:2].set(1)
+        jac_sparsity_mat = jac_sparsity_mat.at[6:8, ::2].set(1)
+        jac_sparsity_mat = jac_sparsity_mat.at[3:6, 1:9:2].set(1)
+        jac_sparsity_mat = jac_sparsity_mat.at[8:10, 1::2].set(1)
+        
+        # Create the solver once with sparsity pattern (without bounds for now)
+        self.solver = jaxopt.ScipyLeastSquares(
+            fun=lambda params, targets: self.residuals(params, targets),
+            method='lm',
+            options={
+                'jac_sparsity': jac_sparsity_mat,
+            }
+        )
+
+    def inverse_kinematics(self, transform_targets: np.ndarray):
         '''
         transform_targets is Nx4x4 
         ee_links is N long
         '''
-
-        base_link_name = 'base'
-
-        # build up kinematic chains as lists of joints
-        kinematic_chain_maps = {'base': []}
-        for link_name, child_info_list in self.urdf.child_map.items():
-            for (joint_name, child_link_name) in child_info_list:
-                kinematic_chain_maps[child_link_name] = kinematic_chain_maps[link_name] + [joint_name]
-
-        @jax.jit
-        def forward_kinematics(joint_angles):
-            mat = np.eye(4)
-            for ee_link_name in ee_links:
-                for joint_name in kinematic_chain_maps[ee_link_name]:
-                    joint = self.urdf.joint_map[joint_name]
-                    joint_index = list(self.urdf.joint_map.keys()).index(joint_name)
-                    joint_mat = self.make_transform_mat(joint, joint_angles[joint_index])
-                    mat = mat @ joint_mat
-            return mat
-                
-        def residuals(joint_angle_vector):
-            end_effector_mats = []
-            for transform_target in transform_targets:
-                end_effector_mat = forward_kinematics(joint_angle_vector)
-                end_effector_mats.append(end_effector_mat)
-            return (np.array(end_effector_mats) - np.array(transform_targets)).flatten()
-
-        opt_result = jaxopt.ScipyLeastSquares(fun=residuals, method='lm').run(np.zeros(len(self.urdf.joints)))
+        # Convert to JAX array if needed
+        transform_targets = np.array(transform_targets)
+        
+        # Run the pre-compiled solver
+        opt_result, _opt_info = self.solver.run(
+            self.last_solution, 
+            transform_targets
+        )
+        
+        # Update last solution for warm starting
+        self.last_solution = opt_result
         return opt_result
 
 if __name__ == '__main__':
     urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
-    ik_solver = RobotInverseKinematics(urdf_path)
-    ik_solver.inverse_kinematics(['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop'], [np.eye(4)])
-    ik_solver.inverse_kinematics(['KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], [np.eye(4)])
+    ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
+    for i in tqdm(range(1000)):
+        ik_solver.inverse_kinematics([np.eye(4), np.eye(4)])
