@@ -7,8 +7,12 @@ from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from tqdm import tqdm
 from line_profiler import profile
 from kscale_vr_teleop.udp_conn import UDPHandler, RLUDPHandler
+from kscale_vr_teleop.jax_ik import RobotInverseKinematics
+from kscale_vr_teleop._assets import ASSETS_DIR
 
-urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
+urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
+urdf_logger = URDFLogger(urdf_path)
+
 
 def sphere_points(center, radius, n_theta=32, n_phi=16):
 	"""Generate points on sphere surface for visualization."""
@@ -46,6 +50,8 @@ arms_robot.update_cfg({k.name: 0 for k in arms_robot.actuated_joints})
 
 udp_handler = UDPHandler("127.0.0.1", 8888)
 
+ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
+
 err = []
 @profile
 def main():
@@ -68,6 +74,10 @@ def main():
             timestamp = int(i)
 
         left_arm_joints, right_arm_joints = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
+        # joints = ik_solver.inverse_kinematics(np.array([np.eye(4), frame_mat]))
+        # left_arm_joints = joints[1::2]
+        # right_arm_joints = joints[::2]
+
 
         rr.set_time_seconds('my_timeline', timestamp.timestamp())
 

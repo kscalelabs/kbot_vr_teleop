@@ -7,6 +7,7 @@ from scipy.spatial.transform import Rotation
 from scipy.optimize import least_squares
 from yourdfpy import URDF
 from kscale_vr_teleop.analysis.visualizer import ThreadedRobotVisualizer
+from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from scipy.optimize import least_squares
 from yourdfpy import URDF
 
@@ -37,6 +38,8 @@ def make_robot():
     
 arms_robot = make_robot()
 
+jax_ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
+
 VISUALIZE = False
 
 if VISUALIZE:
@@ -64,6 +67,16 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_gues
         arms_robot.update_cfg(config_base)
         right_ee_position = arms_robot.get_transform('KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', "base")
         left_ee_position = arms_robot.get_transform('KB_C_501X_Left_Bayonet_Adapter_Hard_Stop', "base")
+        ee_mats = jax_ik_solver.forward_kinematics(joint_angles)
+
+        # These asserts pass every time
+        # np.testing.assert_allclose(right_ee_position, ee_mats[0], atol=1e-6)
+        # np.testing.assert_allclose(left_ee_position, ee_mats[1], atol=1e-6)
+
+        # If these are uncommented it breaks
+        right_ee_position = np.array(ee_mats[0])
+        left_ee_position = np.array(ee_mats[1])
+
         right_ee_forward = -right_ee_position[:3,2]
         left_ee_forward = left_ee_position[:3,2]
         right_target_forward = -right_wrist_mat[:3, 2]
@@ -72,10 +85,12 @@ def calculate_arm_joints(head_mat, left_wrist_mat, right_wrist_mat, initial_gues
         left_ee_up = left_ee_position[:3, 1]
         right_target_up = right_wrist_mat[:3,1]
         left_target_up = left_wrist_mat[:3,1]
-        right_rotation_angle_off = np.arccos(np.dot(right_ee_forward, right_target_forward))
-        left_rotation_angle_off = np.arccos(np.dot(left_ee_forward, left_target_forward))
-        right_y_angle_off = np.arccos(np.dot(right_ee_up, right_target_up))
-        left_y_angle_off = np.arccos(np.dot(left_ee_up, left_target_up))
+        arccos_approx = lambda x: np.pi/2 - x - x**3/6
+        # arccos_approx = lambda x: np.arccos(x)
+        right_rotation_angle_off = arccos_approx(np.dot(right_ee_forward, right_target_forward))
+        left_rotation_angle_off = arccos_approx(np.dot(left_ee_forward, left_target_forward))
+        right_y_angle_off = arccos_approx(np.dot(right_ee_up, right_target_up))
+        left_y_angle_off = arccos_approx(np.dot(left_ee_up, left_target_up))
         return np.concatenate([
             right_ee_position[:3, 3] - right_wrist_mat[:3, 3],
             left_ee_position[:3, 3] - left_wrist_mat[:3, 3],
