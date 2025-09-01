@@ -1,10 +1,10 @@
 from urdf_parser_py import urdf as urdf_parser
 from pathlib import Path
 import jax
-# import jax.numpy as np
-# from jax.scipy.spatial.transform import Rotation
-import numpy as np
-from scipy.spatial.transform import Rotation
+import jax.numpy as np
+from jax.scipy.spatial.transform import Rotation
+# import numpy as np
+# from scipy.spatial.transform import Rotation
 import jaxopt
 from tqdm import tqdm
 
@@ -48,8 +48,8 @@ class RobotInverseKinematics:
                 res.append(mat)
             return np.array(res)
 
-        # self.forward_kinematics = jax.jit(forward_kinematics)
-        self.forward_kinematics = forward_kinematics
+        self.forward_kinematics = jax.jit(forward_kinematics)
+        # self.forward_kinematics = forward_kinematics
 
         upper_bounds = []
         lower_bounds = []
@@ -64,8 +64,8 @@ class RobotInverseKinematics:
         self.lower_bounds = np.array(lower_bounds)
         self.last_solution = np.zeros(len(self.active_joints))
         
-                # Pre-compile the residuals function and create the solver once
-        # self._setup_ik_solver()
+        # Pre-compile the residuals function and create the solver once
+        self._setup_ik_solver()
 
     @staticmethod
     def make_transform_mat(joint: urdf_parser.Joint, joint_angle: float) -> np.ndarray:
@@ -78,15 +78,15 @@ class RobotInverseKinematics:
         
         # Translation matrix
         T = np.eye(4)
-        # T = T.at[:3, 3].set(origin_position)
-        T[:3, 3] = origin_position
+        T = T.at[:3, 3].set(origin_position)
+        # T[:3, 3] = origin_position
         
         # Origin rotation matrix (fixed frame: roll around X, pitch around Y, yaw around Z)
         R_origin = np.eye(4)
         if joint.origin.rotation is not None:
             rot_matrix = Rotation.from_euler('xyz', origin_rotation_rpy).as_matrix()
-            # R_origin = R_origin.at[:3, :3].set(rot_matrix)
-            R_origin[:3, :3] = rot_matrix
+            R_origin = R_origin.at[:3, :3].set(rot_matrix)
+            # R_origin[:3, :3] = rot_matrix
         
         if joint.joint_type == 'fixed':
             return T @ R_origin
@@ -95,8 +95,8 @@ class RobotInverseKinematics:
             rot_axis = np.array(joint.axis)
             joint_rot_mat = Rotation.from_rotvec(joint_angle * rot_axis).as_matrix()
             R_joint = np.eye(4)
-            # R_joint = R_joint.at[:3, :3].set(joint_rot_mat)
-            R_joint[:3, :3] = joint_rot_mat
+            R_joint = R_joint.at[:3, :3].set(joint_rot_mat)
+            # R_joint[:3, :3] = joint_rot_mat
             
             # Correct order from test_all_combinations.py: T @ R_origin @ R_joint (no transpose needed)
             result = T @ R_origin @ R_joint
@@ -123,16 +123,11 @@ class RobotInverseKinematics:
             right_target_up = right_wrist_mat[:3,1]
             left_target_up = left_wrist_mat[:3,1]
             
-            # Clamp dot products to avoid numerical issues with arccos
-            right_dot_forward = np.clip(np.dot(right_ee_forward, right_target_forward), -1.0, 1.0)
-            left_dot_forward = np.clip(np.dot(left_ee_forward, left_target_forward), -1.0, 1.0)
-            right_dot_up = np.clip(np.dot(right_ee_up, right_target_up), -1.0, 1.0)
-            left_dot_up = np.clip(np.dot(left_ee_up, left_target_up), -1.0, 1.0)
-            
-            right_rotation_angle_off = np.arccos(right_dot_forward)
-            left_rotation_angle_off = np.arccos(left_dot_forward)
-            right_y_angle_off = np.arccos(right_dot_up)
-            left_y_angle_off = np.arccos(left_dot_up)
+            arccos_approx = lambda x: np.pi/2 - x - x**3/6
+            right_rotation_angle_off = arccos_approx(np.dot(right_ee_forward, right_target_forward))
+            left_rotation_angle_off = arccos_approx(np.dot(left_ee_forward, left_target_forward))
+            right_y_angle_off = arccos_approx(np.dot(right_ee_up, right_target_up))
+            left_y_angle_off = arccos_approx(np.dot(left_ee_up, left_target_up))
             
             return np.concatenate([
                 right_ee_position[:3, 3] - right_wrist_mat[:3, 3],
@@ -151,12 +146,13 @@ class RobotInverseKinematics:
         jac_sparsity_mat = jac_sparsity_mat.at[8:10, 1::2].set(1)
         
         # Create the solver once with sparsity pattern (without bounds for now)
-        self.solver = jaxopt.ScipyLeastSquares(
-            fun=lambda params, targets: self.residuals(params, targets),
-            method='lm',
-            options={
-                'jac_sparsity': jac_sparsity_mat,
-            }
+        self.solver = jaxopt.LevenbergMarquardt(
+            residual_fun=lambda params, targets: self.residuals(params, targets),
+            # fun=lambda params, targets: self.residuals(params, targets),
+            # method='lm',
+            # options={
+            #     'jac_sparsity': jac_sparsity_mat,
+            # }
         )
 
     def inverse_kinematics(self, transform_targets: np.ndarray):
