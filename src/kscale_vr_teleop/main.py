@@ -10,6 +10,7 @@ from kscale_vr_teleop.util import fast_mat_inv
 from scipy.spatial.transform import Rotation
 import time
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
+import os
 
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop._assets import ASSETS_DIR
@@ -57,7 +58,7 @@ else:
 left_arm_joints = np.zeros(5)
 right_arm_joints = np.zeros(5)
 
-STREAM = False
+STREAM = bool(os.environ.get("STREAM", False))
 
 base_to_head_transform = np.eye(4)
 base_to_head_transform[:3,3] = np.array([
