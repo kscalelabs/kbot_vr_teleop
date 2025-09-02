@@ -14,6 +14,7 @@ import os
 
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop._assets import ASSETS_DIR
+from kscale_vr_teleop.kos_conn import KOSHandler
 
 urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
@@ -54,7 +55,8 @@ wrist_index = 0
 if SEND_EE_CONTROL:
     udp_handler = RLUDPHandler(UDP_HOST)
 else:
-    udp_handler = UDPHandler(UDP_HOST, 8888)
+    # udp_handler = UDPHandler(UDP_HOST, 8888)
+    udp_handler = KOSHandler()
 
 left_arm_joints = np.zeros(5)
 right_arm_joints = np.zeros(5)
