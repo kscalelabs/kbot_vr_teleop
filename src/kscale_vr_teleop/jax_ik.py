@@ -1,3 +1,5 @@
+import os
+os.environ['JAX_PLATFORM_NAME'] = 'cpu'
 from urdf_parser_py import urdf as urdf_parser
 from pathlib import Path
 import jax
@@ -178,13 +180,16 @@ class RobotInverseKinematics:
         jac_sparsity_mat = jac_sparsity_mat.at[8:10, 1::2].set(1)
         
         # Create the solver once with sparsity pattern (without bounds for now)
-        self.solver = jaxopt.LevenbergMarquardt(
-            residual_fun=lambda params, targets: self.residuals(params, targets),
-            # fun=lambda params, targets: self.residuals(params, targets),
-            # method='lm',
-            # options={
-            #     'jac_sparsity': jac_sparsity_mat,
-            # }
+        self.solver = jaxopt.ScipyLeastSquares(
+            # residual_fun=lambda params, targets: self.residuals(params, targets),
+            fun=lambda params, targets: self.residuals(params, targets),
+            method='lm',
+            options={
+                'jac_sparsity': jac_sparsity_mat,
+                'xtol': 1e-3,
+                'gtol': 1e-3,
+                'ftol': 1e-3,
+            }
         )
 
     def inverse_kinematics(self, transform_targets: np.ndarray):
