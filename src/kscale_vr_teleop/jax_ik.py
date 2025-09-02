@@ -134,6 +134,9 @@ class RobotInverseKinematics:
         # Pre-compile the residuals function and create the solver once
         self._setup_ik_solver()
 
+        # Warmup JIT functions
+        self.inverse_kinematics([np.eye(4), np.eye(4)])
+
 
 
     def _setup_ik_solver(self) -> None:
