@@ -15,6 +15,7 @@ import os
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop._assets import ASSETS_DIR
 from kscale_vr_teleop.kos_conn import KOSHandler
+from kscale_vr_teleop.command_conn import Commander16
 
 urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
@@ -56,7 +57,8 @@ if SEND_EE_CONTROL:
     udp_handler = RLUDPHandler(UDP_HOST)
 else:
     # udp_handler = UDPHandler(UDP_HOST, 8888)
-    udp_handler = KOSHandler()
+    # udp_handler = KOSHandler()
+    handler = Commander16()
 
 left_arm_joints = np.zeros(5)
 right_arm_joints = np.zeros(5)
@@ -92,7 +94,7 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         if SEND_EE_CONTROL:
             udp_handler._send_udp(hand_target_left, hand_target_right)
         else:
-            udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
+            handler.send_commands(right_arm_joints, left_arm_joints)
 
         if VISUALIZE:
             new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
