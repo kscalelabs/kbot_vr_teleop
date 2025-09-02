@@ -18,6 +18,7 @@ from kscale_vr_teleop._assets import ASSETS_DIR
 urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
 SEND_EE_CONTROL = False
+VISUALIZE = bool(os.environ.get("VISUALIZE", False))
 UDP_HOST = "127.0.0.1"  # change if needed
 
 urdf_logger = URDFLogger(urdf_path)
@@ -91,7 +92,10 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         else:
             udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
 
-        # urdf_logger.log(new_config)
+        if VISUALIZE:
+            new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
+            new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[1::2])})
+            urdf_logger.log(new_config)
         if STREAM:
             ret_left, frame_left = cam_left.read()
             if not ret_left:
