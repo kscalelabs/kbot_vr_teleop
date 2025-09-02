@@ -74,7 +74,7 @@ def main():
             timestamp = int(i)
 
         # left_arm_joints, right_arm_joints = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
-        joints = ik_solver.inverse_kinematics(np.array([np.eye(4), frame_mat]))
+        joints = ik_solver.inverse_kinematics(np.array([frame_mat, np.eye(4)]))
         left_arm_joints = joints[1::2]
         right_arm_joints = joints[::2]
 
