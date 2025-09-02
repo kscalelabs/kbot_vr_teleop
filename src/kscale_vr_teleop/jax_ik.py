@@ -180,10 +180,10 @@ class RobotInverseKinematics:
         jac_sparsity_mat = jac_sparsity_mat.at[8:10, 1::2].set(1)
         
         # Create the solver once with sparsity pattern (without bounds for now)
-        self.solver = jaxopt.ScipyLeastSquares(
+        self.solver = jaxopt.ScipyBoundedLeastSquares(
             # residual_fun=lambda params, targets: self.residuals(params, targets),
-            fun=lambda params, targets: self.residuals(params, targets),
-            method='lm',
+            fun=self.residuals,
+            method='dogbox',
             options={
                 'jac_sparsity': jac_sparsity_mat,
                 'xtol': 1e-3,
@@ -203,6 +203,10 @@ class RobotInverseKinematics:
         # Run the pre-compiled solver
         opt_result, _opt_info = self.solver.run(
             self.last_solution, 
+            (
+                self.lower_bounds,
+                self.upper_bounds
+            ),
             transform_targets
         )
         
