@@ -20,7 +20,7 @@ urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 SEND_EE_CONTROL = False
 UDP_HOST = "127.0.0.1"  # change if needed
 
-urdf_logger = URDFLogger("/home/miller/code/vr_teleop/src/assets/kbot/robot.urdf")
+urdf_logger = URDFLogger(urdf_path)
 
 import rerun as rr
 
