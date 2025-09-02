@@ -79,8 +79,8 @@ def main():
 
         rr.set_time_seconds('my_timeline', timestamp.timestamp())
 
-        new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[1::2])})
+        new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
+        new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[1::2])})
 
         target_pos = frame_mat[:3,3]
         rr.log('target_position', rr.Transform3D(translation=frame_mat[:3,3], mat3x3=frame_mat[:3,:3], axis_length=0.05))

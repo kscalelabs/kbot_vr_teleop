@@ -24,7 +24,7 @@ class URDFLogger:
         urdf_contents = open(filepath, 'r').read()
         urdf_parent_path =Path(filepath).absolute().parent
         urdf_contents = urdf_contents.replace('filename="', f'filename="{urdf_parent_path}/')
-        self.urdf = urdf_parser.URDF.from_xml_string(urdf_contents)
+        self.urdf: urdf_parser.Robot = urdf_parser.URDF.from_xml_string(urdf_contents)
         self.mat_name_to_mat = {mat.name: mat for mat in self.urdf.materials}
         self.entity_to_transform = {}
         self.root_path = root_path
