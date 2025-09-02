@@ -4,7 +4,6 @@ import asyncio
 from vuer.schemas import ImageBackground, Hands
 import numpy as np
 from erics_cameras.libcamera_cam import LibCameraCam
-from kscale_vr_teleop.arm_inverse_kinematics import calculate_arm_joints, arms_robot, right_arm_links
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
 from kscale_vr_teleop.udp_conn import UDPHandler, RLUDPHandler
 from kscale_vr_teleop.util import fast_mat_inv
@@ -90,15 +89,6 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
             udp_handler._send_udp(hand_target_left, hand_target_right)
         else:
             udp_handler._send_udp(right_arm_joints, left_arm_joints, right_finger_joints, left_finger_joints)
-
-        new_config = {k.name: right_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[::2])}
-        new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(arms_robot.actuated_joints[1::2])})
-
-        # arms_robot.update_cfg(new_config)
-        # hand_pose_right = arms_robot.get_transform("KB_C_501X_Right_Bayonet_Adapter_Hard_Stop", "base")
-        # hand_pose_left = arms_robot.get_transform("KB_C_501X_Left_Bayonet_Adapter_Hard_Stop", "base")
-        # rr.log("hand_position_right", rr.Transform3D(translation=hand_pose_right[:3, 3], mat3x3=hand_pose_right[:3, :3], axis_length=0.1))
-        # rr.log("hand_position_left", rr.Transform3D(translation=hand_pose_left[:3, 3], mat3x3=hand_pose_left[:3, :3], axis_length=0.1))
 
         # urdf_logger.log(new_config)
         if STREAM:
