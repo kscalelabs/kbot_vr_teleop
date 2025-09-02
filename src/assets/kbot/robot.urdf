@@ -38,7 +38,7 @@
     <parent link="Torso_Side_Left"/>
     <child link="KC_C_104L_PitchHardstopDriven"/>
     <limit effort="60" velocity="18.849" lower="-1.047" upper="3.49"/>
-    <axis xyz="0 0 -1"/>
+    <axis xyz="0 0 1"/>
   </joint>
   <joint name="dof_right_shoulder_roll_03" type="revolute">
     <origin xyz="-0.024250 0 -0.080000" rpy="-3.141593 -1.570796 0"/>
@@ -80,7 +80,7 @@
     <parent link="KC_C_202L"/>
     <child link="KC_C_401L_L_UpForearmDrive"/>
     <limit effort="17" velocity="37.699" lower="-2.478368" upper="0"/>
-    <axis xyz="0 0 1"/>
+    <axis xyz="0 0 -1"/>
   </joint>
   <joint name="dof_right_wrist_00" type="revolute">
     <origin xyz="0.103000 0.017350 -0.018000" rpy="0 -1.570796 0"/>
