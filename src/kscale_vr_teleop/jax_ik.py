@@ -155,8 +155,8 @@ class RobotInverseKinematics:
             left_target_forward = -left_wrist_mat[:3, 2]
             right_ee_up = -right_ee_position[:3, 1]
             left_ee_up = left_ee_position[:3, 1]
-            right_target_up = right_wrist_mat[:3,1]
-            left_target_up = left_wrist_mat[:3,1]
+            right_target_up = -right_wrist_mat[:3,0] # towards the thumb
+            left_target_up = left_wrist_mat[:3,0]
             
             arccos_approx = lambda x: np.pi/2 - x - x**3/6
             right_rotation_angle_off = arccos_approx(np.dot(right_ee_forward, right_target_forward))
