@@ -5,12 +5,10 @@ const fs = require('fs');
 
 const app = express();
 
-const ip = '10.33.13.41'
-
 // SSL certificate options (update IP to match your certificate)
 const options = {
-  key: fs.readFileSync(`./${ip}+3-key.pem`),
-  cert: fs.readFileSync(`./${ip}+3.pem`)
+  key: fs.readFileSync(`./cert-key.pem`),
+  cert: fs.readFileSync(`./cert.pem`)
 };
 
 // Create proxy middleware with WebSocket support
@@ -31,6 +29,5 @@ const server = https.createServer(options, app);
 server.on('upgrade', proxy.upgrade);
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`HTTPS proxy server running on https://${ip}`);
   console.log(`Proxying requests to http://localhost:8012`);
 });
