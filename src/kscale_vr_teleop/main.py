@@ -30,9 +30,9 @@ import rerun as rr
 
 logs_folder = Path(f'~/.vr_teleop_logs/{time.strftime("%Y-%m-%d")}/').expanduser()
 logs_folder.mkdir(parents=True, exist_ok=True)
-logs_path = logs_folder / time.strftime("%H-%M-%S")
+logs_path = logs_folder / f'{time.strftime("%H-%M-%S")}.rrd'
 
-rr.init("vr_teleop", spawn=True)
+rr.init("vr_teleop", spawn=VISUALIZE)
 
 rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
 kbot_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
@@ -55,8 +55,17 @@ dist_coeffs = np.array([[-6.07417419e-02,9.95447444e-02,-2.26448001e-04,1.228818
 head_matrix = np.eye(4, dtype=np.float32)
 right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
 left_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
-right_wrist_pose = np.zeros((4, 4), dtype=np.float32)
-left_wrist_pose = np.zeros((4, 4), dtype=np.float32)
+right_wrist_pose = np.eye(4,dtype=np.float32)
+left_wrist_pose = np.eye(4,dtype=np.float32)
+left_wrist_pose[:3,3] = np.array([0.2, 0.2, -0.4])
+right_wrist_pose[:3,3] = np.array([0.2, -0.2, -0.4])
+default_wrist_rotation = np.array([
+    [0, 0, -1],
+    [-1, 0, 0],
+    [0, 1, 0]
+])
+left_wrist_pose[:3,:3] = default_wrist_rotation
+right_wrist_pose[:3,:3] = default_wrist_rotation
 wrist_index = 0
 if SEND_EE_CONTROL:
     udp_handler = RLUDPHandler(UDP_HOST)
@@ -180,18 +189,20 @@ if __name__ == "__main__":
                 right_wrist_pose[:3, 3] -= head_matrix[:3, 3]
                 right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
                 rr.log('right_wrist', rr.Transform3D(translation=right_wrist_pose[:3, 3], mat3x3=right_wrist_pose[:3, :3], axis_length=0.05))
-    @app.spawn(start=True)
-    async def main(session: VuerSession):
-        session.upsert(
-            Hands(
-                stream=True,
-                key="hands",
-                hideLeft=False,       # hides the hand, but still streams the data.
-                hideRight=False,      # hides the hand, but still streams the data.
-            ),
-            to="bgChildren",
-        )
-        await stream_cameras(session)
+    try:
+        @app.spawn(start=True)
+        async def main(session: VuerSession):
+                session.upsert(
+                    Hands(
+                        stream=True,
+                        key="hands",
+                        hideLeft=False,       # hides the hand, but still streams the data.
+                        hideRight=False,      # hides the hand, but still streams the data.
+                    ),
+                    to="bgChildren",
+                )
+                await stream_cameras(session)
+    finally:
+        print("Saving logs to", logs_path)
+        rr.save(logs_path)
     app.run()
-
-    rr.save(logs_path)
