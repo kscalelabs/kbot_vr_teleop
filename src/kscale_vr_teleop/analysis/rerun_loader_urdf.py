@@ -30,6 +30,7 @@ class URDFLogger:
         self.entity_to_transform = {}
         self.root_path = root_path
         self.meshes_cache = {}
+        self.mesh_data_cache = {}
     
 
     def link_entity_path(self, link: urdf_parser.Link) -> str:
@@ -122,6 +123,11 @@ class URDFLogger:
 
         self.entity_to_transform[self.root_path + entity_path] = (translation, rotation)
         rr.log(self.root_path + entity_path, rr.Transform3D(translation=translation, mat3x3=rotation))
+    
+    def load_mesh(self, path):
+        if path not in self.mesh_data_cache:
+            self.mesh_data_cache[path] = trimesh.load_mesh(path)
+        return self.mesh_data_cache[path]
 
     @profile
     def log_visual(self, entity_path: str, visual: urdf_parser.Visual) -> None:
@@ -141,7 +147,7 @@ class URDFLogger:
         if isinstance(visual.geometry, urdf_parser.Mesh):
             resolved_path = resolve_ros_path(visual.geometry.filename)
             mesh_scale = visual.geometry.scale
-            mesh_or_scene = trimesh.load_mesh(resolved_path)
+            mesh_or_scene = self.load_mesh(resolved_path)#
             if mesh_scale is not None:
                 transform[:3, :3] *= mesh_scale
         elif isinstance(visual.geometry, urdf_parser.Box):
