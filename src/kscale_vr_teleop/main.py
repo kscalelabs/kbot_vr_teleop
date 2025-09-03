@@ -3,11 +3,9 @@ from vuer import Vuer, VuerSession
 import asyncio
 from vuer.schemas import ImageBackground, Hands
 import numpy as np
-from erics_cameras.libcamera_cam import LibCameraCam
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
-from kscale_vr_teleop.udp_conn import UDPHandler, RLUDPHandler
+from kscale_vr_teleop.udp_conn import RLUDPHandler
 from kscale_vr_teleop.util import fast_mat_inv
-from scipy.spatial.transform import Rotation
 import time
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 import os
