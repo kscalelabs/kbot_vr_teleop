@@ -31,6 +31,7 @@ class URDFLogger:
         self.root_path = root_path
         self.meshes_cache = {}
         self.mesh_data_cache = {}
+        rr.log(self.root_path + "", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)  # default ROS convention
     
 
     def link_entity_path(self, link: urdf_parser.Link) -> str:
@@ -62,7 +63,6 @@ class URDFLogger:
         else:
             raise TypeError("joint_angles must be None, dict, or list/tuple/ndarray")
 
-        rr.log(self.root_path + "", rr.ViewCoordinates.RIGHT_HAND_Z_UP, timeless=True)  # default ROS convention
 
         for joint in self.urdf.joints:
             entity_path = self.joint_entity_path(joint)
@@ -170,12 +170,13 @@ class URDFLogger:
         
         # mesh_or_scene.apply_transform(transform)
         if entity_path in self.meshes_cache:
-            rr.log(self.root_path + entity_path, rr.InstancePoses3D(
-                translations=[
-                    transform[:3, 3].tolist()
-                ],
-                mat3x3=[transform[:3, :3].tolist()]
-            ))
+            pass
+            # rr.log(self.root_path + entity_path, rr.InstancePoses3D(
+            #     translations=[
+            #         transform[:3, 3].tolist()
+            #     ],
+            #     mat3x3=[transform[:3, :3].tolist()]
+            # ))
         else:
             if isinstance(mesh_or_scene, trimesh.Scene):
                 scene = mesh_or_scene
@@ -230,6 +231,7 @@ def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
             albedo_texture=albedo_texture,
             vertex_texcoords=vertex_texcoords,
         ),
+        static=True,
     )
 
 
