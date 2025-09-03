@@ -16,6 +16,8 @@ from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop._assets import ASSETS_DIR
 from kscale_vr_teleop.kos_conn import KOSHandler
 from kscale_vr_teleop.command_conn import Commander16
+from pathlib import Path
+from line_profiler import profile
 
 urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
@@ -26,6 +28,10 @@ UDP_HOST = "127.0.0.1"  # change if needed
 urdf_logger = URDFLogger(urdf_path)
 
 import rerun as rr
+
+logs_folder = Path(f'~/.vr_teleop_logs/{time.strftime("%Y-%m-%d")}/').expanduser()
+logs_folder.mkdir(parents=True, exist_ok=True)
+logs_path = logs_folder / time.strftime("%H-%M-%S")
 
 rr.init("vr_teleop", spawn=True)
 
@@ -72,6 +78,7 @@ base_to_head_transform[:3,3] = np.array([
 
 ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
 
+@profile
 async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     if STREAM:
         left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
@@ -187,3 +194,5 @@ if __name__ == "__main__":
         )
         await stream_cameras(session)
     app.run()
+
+    rr.save(logs_path)
