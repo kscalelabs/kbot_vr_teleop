@@ -14,7 +14,6 @@ import os
 
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop._assets import ASSETS_DIR
-from kscale_vr_teleop.kos_conn import KOSHandler
 from kscale_vr_teleop.command_conn import Commander16
 from pathlib import Path
 from line_profiler import profile

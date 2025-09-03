@@ -3,7 +3,6 @@ import scipy
 from scipy.spatial.transform import Rotation
 
 from kscale_vr_teleop.util import fast_mat_inv
-import ikpy.chain
 from yourdfpy import URDF
 from pathlib import Path
 from kscale_vr_teleop.analysis.visualizer import ThreadedRobotVisualizer
