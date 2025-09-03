@@ -93,7 +93,14 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
         # cam_left = cv2.VideoCapture('udp://@127.0.0.1:8554?buffer_size=65535&pkt_size=65535&fifo_size=65535')
     
+    # FPS tracking variables
+    frame_count = 0
+    start_time = time.time()
+    last_fps_print = start_time
+    
     while True:
+        loop_start = time.time()
+        frame_count += 1
         hand_target_left = base_to_head_transform @ left_wrist_pose
         hand_target_right = base_to_head_transform @ right_wrist_pose
         rr.log('hand_target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.05))
@@ -156,6 +163,15 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
                     interpolate=True,
                 ),
             ], to="bgChildren")
+        
+        # Print FPS every second using carriage return for clean output
+        current_time = time.time()
+        if current_time - last_fps_print >= 1.0:
+            elapsed_time = current_time - start_time
+            fps = frame_count / elapsed_time if elapsed_time > 0 else 0
+            print(f"\rFPS: {fps:.1f} | Frames: {frame_count} | Runtime: {elapsed_time:.1f}s", end="", flush=True)
+            last_fps_print = current_time
+        
         await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
 
 
