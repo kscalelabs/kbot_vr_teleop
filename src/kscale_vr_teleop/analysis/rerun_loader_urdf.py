@@ -179,7 +179,6 @@ class URDFLogger:
         self.meshes_cache[entity_path] = mesh
 
 
-@profile
 def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
     vertex_colors = albedo_texture = vertex_texcoords = None
     if isinstance(mesh.visual, trimesh.visual.color.ColorVisuals):
