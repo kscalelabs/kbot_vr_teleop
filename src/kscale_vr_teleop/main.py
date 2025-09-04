@@ -131,10 +131,10 @@ async def control_arms(session: VuerSession):
 async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     if not STREAM:
         return
-    left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-    right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+    left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+    # right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
     cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
-    cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+    # cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
 
     new_cam_mat, _ = cv2.getOptimalNewCameraMatrix(cam_mat, dist_coeffs, (1280, 720), 1, (1280, 720))
     map_x, map_y = cv2.initUndistortRectifyMap(cam_mat, dist_coeffs, None, new_cam_mat, (1280, 720), cv2.CV_32FC1)
@@ -142,19 +142,23 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
     
     # FPS tracking variables
     frame_count = 0    
+    failed_frames = 0
 
     while True:
+        await asyncio.sleep(1/30)
         frame_count += 1
         ret_left, frame_left = cam_left.read()
         if not ret_left:
-            warnings.warn("Failed to read from left camera")
+            warnings.warn(f"Failed to read from left camera ({failed_frames}) consecutive failures")
+            failed_frames += 1
             continue
+        failed_frames = 0
             # frame_left = np.random.randint(0, 255, (720, 1280, 3), dtype=np.uint8) # TODO: remove
         # ret_right, frame_right = cam_right.read()
         # if not ret_left or not ret_right:
         #     continue
         frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
-        frame_left_rgb = cv2.remap(frame_left_rgb, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+        # frame_left_rgb = cv2.remap(frame_left_rgb, map_x, map_y, interpolation=cv2.INTER_LINEAR)
         frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
         cv2.putText(frame_left_rgb, f"Frames: {frame_count}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
         frame_right_rgb = frame_left_rgb.copy()
@@ -191,8 +195,6 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
             ),
         ], to="bgChildren")
         
-        
-        await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
 
 
 if __name__ == "__main__":
