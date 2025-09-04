@@ -3,8 +3,7 @@ from scipy.spatial.transform import Rotation
 
 from kscale_vr_teleop.util import fast_mat_inv
 from pathlib import Path
-
-from kscale_vr_teleop._assets import ASSETS_DIR
+import warnings
 
 file_absolute_parent = Path(__file__).parent.absolute()
 
@@ -32,5 +31,5 @@ def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
 
         return left_joints, combined_angles
     except ValueError:
-        print("ValueError in hand position no ik function")
+        warnings.warn("ValueError in hand position no ik function")
         return np.zeros(6), np.zeros(6)
