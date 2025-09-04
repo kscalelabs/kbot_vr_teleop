@@ -86,19 +86,10 @@ base_to_head_transform[:3,3] = np.array([
 ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
 @profile
-async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
-    if STREAM:
-        left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-        right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
-        cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
-        cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
-        # cam_left = cv2.VideoCapture('udp://@127.0.0.1:8554?buffer_size=65535&pkt_size=65535&fifo_size=65535')
-    
-    # FPS tracking variables
+async def control_arms(session: VuerSession):
     frame_count = 0
     start_time = time.time()
     last_fps_print = start_time
-    
     while True:
         loop_start = time.time()
         frame_count += 1
@@ -126,57 +117,80 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
             new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
             new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[1::2])})
             urdf_logger.log(new_config)
-        if STREAM:
-            ret_left, frame_left = cam_left.read()
-            if not ret_left:
-                warnings.warn("Failed to read from left camera")
-                continue
-            # ret_right, frame_right = cam_right.read()
-            # if not ret_left or not ret_right:
-            #     continue
-            frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
-            frame_left_rgb = cv2.undistort(frame_left_rgb, cam_mat, dist_coeffs)
-            frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
-            frame_right_rgb = frame_left_rgb.copy()
-            interpupilary_dist = 0
 
-            distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1]
-            vertical_angle_rad = np.deg2rad(25)
-            y_offset = -distance_to_camera * np.sin(vertical_angle_rad)
-            z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)
-            session.upsert([
-                ImageBackground(
-                    frame_left_rgb,
-                    aspect=1.778,
-                    height=2,
-                    distanceToCamera=distance_to_camera,
-                    position=[-interpupilary_dist/2, y_offset, z_offset],
-                    layers=1,
-                    format="jpeg",
-                    quality=1000,
-                    key="background-left",
-                    interpolate=True,
-                ),
-                ImageBackground(
-                    frame_right_rgb,
-                    aspect=1.778,
-                    height=2,
-                    distanceToCamera=distance_to_camera,
-                    position=[-interpupilary_dist/2, y_offset, z_offset],
-                    layers=2,
-                    format="jpeg",
-                    quality=1000,
-                    key="background-right",
-                    interpolate=True,
-                ),
-            ], to="bgChildren")
-        
         # Print FPS every second using carriage return for clean output
         current_time = time.time()
         if current_time - last_fps_print >= 1.0:
             fps = 1/(current_time - loop_start)
             print(f"\rFPS: {fps:.2f} | Frames: {frame_count}", end="", flush=True)
             last_fps_print = current_time
+
+        await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
+
+@profile
+async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
+    if not STREAM:
+        return
+    left_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@80000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+    right_pipeline = "libcamerasrc camera-name=/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36 exposure-time-mode=0 analogue-gain-mode=0 ae-enable=true awb-enable=true af-mode=manual ! video/x-raw,format=BGR,width=1280,height=720,framerate=30/1 ! videoconvert ! appsink drop=1 max-buffers=1"
+    cam_left = cv2.VideoCapture(left_pipeline, cv2.CAP_GSTREAMER)
+    cam_right = cv2.VideoCapture(right_pipeline, cv2.CAP_GSTREAMER)
+
+    new_cam_mat, _ = cv2.getOptimalNewCameraMatrix(cam_mat, dist_coeffs, (1280, 720), 1, (1280, 720))
+    map_x, map_y = cv2.initUndistortRectifyMap(cam_mat, dist_coeffs, None, new_cam_mat, (1280, 720), cv2.CV_32FC1)
+    # cam_left = cv2.VideoCapture('udp://@127.0.0.1:8554?buffer_size=65535&pkt_size=65535&fifo_size=65535')
+    
+    # FPS tracking variables
+    frame_count = 0    
+
+    while True:
+        frame_count += 1
+        ret_left, frame_left = cam_left.read()
+        if not ret_left:
+            warnings.warn("Failed to read from left camera")
+            continue
+            # frame_left = np.random.randint(0, 255, (720, 1280, 3), dtype=np.uint8) # TODO: remove
+        # ret_right, frame_right = cam_right.read()
+        # if not ret_left or not ret_right:
+        #     continue
+        frame_left_rgb = cv2.cvtColor(frame_left, cv2.COLOR_BGR2RGB)
+        frame_left_rgb = cv2.remap(frame_left_rgb, map_x, map_y, interpolation=cv2.INTER_LINEAR)
+        frame_left_rgb = cv2.resize(frame_left_rgb, (640, 360), interpolation=cv2.INTER_LINEAR)
+        cv2.putText(frame_left_rgb, f"Frames: {frame_count}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        frame_right_rgb = frame_left_rgb.copy()
+        interpupilary_dist = 0
+
+        distance_to_camera = 3.5*cam_mat[0][0] / frame_left_rgb.shape[1]
+        vertical_angle_rad = np.deg2rad(25)
+        y_offset = -distance_to_camera * np.sin(vertical_angle_rad)
+        z_offset = distance_to_camera * (np.cos(vertical_angle_rad) - 1)
+        session.upsert([
+            ImageBackground(
+                frame_left_rgb,
+                aspect=1.778,
+                height=2,
+                distanceToCamera=distance_to_camera,
+                position=[-interpupilary_dist/2, y_offset, z_offset],
+                layers=1,
+                format="jpeg",
+                quality=1000,
+                key="background-left",
+                interpolate=True,
+            ),
+            ImageBackground(
+                frame_right_rgb,
+                aspect=1.778,
+                height=2,
+                distanceToCamera=distance_to_camera,
+                position=[-interpupilary_dist/2, y_offset, z_offset],
+                layers=2,
+                format="jpeg",
+                quality=1000,
+                key="background-right",
+                interpolate=True,
+            ),
+        ], to="bgChildren")
+        
         
         await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
 
@@ -221,7 +235,12 @@ if __name__ == "__main__":
                     ),
                     to="bgChildren",
                 )
-                await stream_cameras(session)
+                tasks = [
+                    stream_cameras(session),
+                    # control_arms(session)
+                ]
+
+                await asyncio.gather(*tasks)
     finally:
         print("Saving logs to", logs_path)
         rr.save(logs_path)
