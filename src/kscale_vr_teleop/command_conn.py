@@ -75,3 +75,11 @@ class Commander16:
         self.cmds.RWristPitch = float(right_arm_angles[4])
 
         self.sock.sendto(self.cmds.to_msg(), (self.UDP_IP, self.UDP_PORT)) # This line takes a non-trivial amount of time (8e-4s on a *desktop*)
+
+if __name__ == "__main__":
+    cmdr = Commander16()
+    import time
+
+    while True:
+        cmdr.send_commands([0, -15, 0, 90, 0], [0, 15, 0, -90, 0])
+        time.sleep(0.01)
