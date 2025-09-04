@@ -90,6 +90,6 @@ if __name__ == "__main__":
     start = time.time()
     while True:
         t = time.time() - start
-        pos1 = 0.1*np.sin(t)
+        pos1 = 0.5*np.sin(t)
         cmdr.send_commands(np.deg2rad([0, -15, 0, 90, 0, 0, pos1]), np.deg2rad([0, 15, 0, -90, 0]))
         time.sleep(0.01)
