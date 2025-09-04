@@ -186,7 +186,7 @@ class RobotInverseKinematics:
         self.solver = jaxopt.ScipyBoundedLeastSquares(
             # residual_fun=lambda params, targets: self.residuals(params, targets),
             fun=self.residuals,
-            method='dogbox',
+            method='trf',
             options={
                 'jac_sparsity': jac_sparsity_mat,
                 'xtol': 1e-3,
