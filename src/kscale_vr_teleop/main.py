@@ -237,7 +237,7 @@ if __name__ == "__main__":
                 )
                 tasks = [
                     stream_cameras(session),
-                    # control_arms(session)
+                    control_arms(session)
                 ]
 
                 await asyncio.gather(*tasks)
