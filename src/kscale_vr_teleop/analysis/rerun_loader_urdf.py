@@ -17,6 +17,7 @@ import trimesh
 from urdf_parser_py import urdf as urdf_parser
 from pathlib import Path
 from line_profiler import profile
+from rerun.datatypes import RotationAxisAngle, Angle
 
 class URDFLogger:
     """Class to log a URDF to Rerun."""
@@ -31,18 +32,17 @@ class URDFLogger:
         self.root_path = root_path
         self.meshes_cache = {}
         self.mesh_data_cache = {}
+        self.joint_transform_set = set()
         rr.log(self.root_path + "", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)  # default ROS convention
     
 
     def link_entity_path(self, link: urdf_parser.Link) -> str:
         root_name = self.urdf.get_root()
         link_names = self.urdf.get_chain(root_name, link.name)[0::2]  # skip the joints
-        return "/".join(link_names)
+        return "/".join([n+'/link' for n in link_names])
 
     def joint_entity_path(self, joint: urdf_parser.Joint) -> str:
-        root_name = self.urdf.get_root()
-        link_names = self.urdf.get_chain(root_name, joint.child)[0::2]  # skip the joints
-        return "/".join(link_names)
+        return self.link_entity_path(self.urdf.link_map[joint.child])
 
     @profile
     def log(self, joint_angles: Optional[dict | list | tuple] = None) -> None:
@@ -86,44 +86,29 @@ class URDFLogger:
         as a linear displacement along the joint axis (meters).
         """
         # Start from the joint origin (if present)
-        base_trans = np.zeros(3, dtype=float)
-        base_rot = np.eye(3, dtype=float)
 
-        if joint.origin is not None and joint.origin.xyz is not None:
-            base_trans = np.array(joint.origin.xyz, dtype=float)
+        if entity_path not in self.joint_transform_set:
+            base_trans = np.zeros(3, dtype=float)
+            base_rot = np.eye(3, dtype=float)
 
-        if joint.origin is not None and joint.origin.rpy is not None:
-            base_rot = st.Rotation.from_euler("xyz", joint.origin.rpy).as_matrix()
+            if joint.origin is not None and joint.origin.xyz is not None:
+                base_trans = np.array(joint.origin.xyz, dtype=float)
 
-        transform = np.eye(4, dtype=float)
-        transform[:3, :3] = base_rot
-        transform[:3, 3] = base_trans
+            if joint.origin is not None and joint.origin.rpy is not None:
+                base_rot = st.Rotation.from_euler("xyz", joint.origin.rpy).as_matrix()
 
-        jtype = (joint.type or "").lower()
+            origin_transform = np.eye(4, dtype=float)
+            origin_transform[:3, :3] = base_rot
+            origin_transform[:3, 3] = base_trans
+            rr.log(self.root_path + entity_path[:-len('/link')], rr.Transform3D(translation=origin_transform[:3, 3], mat3x3=origin_transform[:3, :3]), static=True)
+            joint_axis = joint.axis if joint.axis is not None else [1, 0, 0]
+            rr.log(self.root_path + entity_path, rr.Transform3D(rotation_axis_angle=RotationAxisAngle(joint_axis, Angle(angle))))
+            self.joint_transform_set.add(entity_path)
+        else:
+            joint_axis = joint.axis if joint.axis is not None else [1, 0, 0]
+            rr.log(self.root_path + entity_path, rr.Transform3D.from_fields(quaternion=st.Rotation.from_rotvec(np.array(joint_axis) * angle).as_quat()))
 
-        if jtype in ("revolute", "continuous"):
-            axis = np.array(joint.axis, dtype=float) if joint.axis is not None else np.array([1.0, 0.0, 0.0])
-            if np.linalg.norm(axis) == 0:
-                axis = np.array([1.0, 0.0, 0.0])
-            axis = axis / np.linalg.norm(axis)
-            # Rotation about axis by 'angle' radians
-            rot = st.Rotation.from_rotvec(angle * axis).as_matrix()
-            transform[:3, :3] = base_rot @ rot
-        elif jtype == "prismatic":
-            axis = np.array(joint.axis, dtype=float) if joint.axis is not None else np.array([1.0, 0.0, 0.0])
-            if np.linalg.norm(axis) == 0:
-                axis = np.array([1.0, 0.0, 0.0])
-            axis = axis / np.linalg.norm(axis)
-            # Translate along axis by 'angle' meters
-            transform[:3, 3] = base_trans + axis * angle
-            transform[:3, :3] = base_rot
 
-        translation = transform[:3, 3].tolist()
-        rotation = transform[:3, :3]
-
-        self.entity_to_transform[self.root_path + entity_path] = (translation, rotation)
-        rr.log(self.root_path + entity_path, rr.Transform3D(translation=translation, mat3x3=rotation))
-    
     def load_mesh(self, path):
         if path not in self.mesh_data_cache:
             self.mesh_data_cache[path] = trimesh.load_mesh(path)
