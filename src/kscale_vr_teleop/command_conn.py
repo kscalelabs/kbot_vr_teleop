@@ -1,6 +1,7 @@
 import json
 import socket
 from dataclasses import dataclass
+import numpy as np
 
 
 @dataclass
@@ -20,6 +21,8 @@ class ControlVector16:
     RShoulderRoll: float = 0.0
     RElbowPitch: float = 0.0
     RElbowRoll: float = 0.0
+    RWristRoll: float = 0.0
+    RWristYaw: float = 0.0
     RWristPitch: float = 0.0
 
     # 11..15 left arm
@@ -42,6 +45,8 @@ class ControlVector16:
             "RShoulderRoll": self.RShoulderRoll,
             "RElbowPitch": self.RElbowPitch,
             "RElbowRoll": self.RElbowRoll,
+            "RWristRoll": self.RWristRoll,
+            "RWristYaw": self.RWristYaw,
             "RWristPitch": self.RWristPitch,
             "LShoulderPitch": self.LShoulderPitch,
             "LShoulderRoll": self.LShoulderRoll,
@@ -72,7 +77,9 @@ class Commander16:
         self.cmds.RShoulderRoll = float(right_arm_angles[1])
         self.cmds.RElbowPitch = float(right_arm_angles[2])
         self.cmds.RElbowRoll = float(right_arm_angles[3])
-        self.cmds.RWristPitch = float(right_arm_angles[4])
+        self.cmds.RWristRoll = float(right_arm_angles[4])
+        self.cmds.RWristYaw = float(right_arm_angles[5])
+        self.cmds.RWristPitch = float(right_arm_angles[6])
 
         self.sock.sendto(self.cmds.to_msg(), (self.UDP_IP, self.UDP_PORT)) # This line takes a non-trivial amount of time (8e-4s on a *desktop*)
 
@@ -80,6 +87,9 @@ if __name__ == "__main__":
     cmdr = Commander16()
     import time
 
+    start = time.time()
     while True:
-        cmdr.send_commands([0, -15, 0, 90, 0], [0, 15, 0, -90, 0])
+        t = time.time() - start
+        pos1 = 0.1*np.sin(t)
+        cmdr.send_commands(np.deg2rad([0, -15, 0, 90, 0, 0, pos1]), np.deg2rad([0, 15, 0, -90, 0]))
         time.sleep(0.01)
