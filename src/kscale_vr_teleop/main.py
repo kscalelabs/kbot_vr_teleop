@@ -15,6 +15,7 @@ from kscale_vr_teleop._assets import ASSETS_DIR
 from kscale_vr_teleop.command_conn import Commander16
 from pathlib import Path
 from line_profiler import profile
+import warnings
 
 urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
 
@@ -123,6 +124,7 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         if STREAM:
             ret_left, frame_left = cam_left.read()
             if not ret_left:
+                warnings.warn("Failed to read from left camera")
                 continue
             # ret_right, frame_right = cam_right.read()
             # if not ret_left or not ret_right:
