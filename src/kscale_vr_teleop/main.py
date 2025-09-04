@@ -174,9 +174,8 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         # Print FPS every second using carriage return for clean output
         current_time = time.time()
         if current_time - last_fps_print >= 1.0:
-            elapsed_time = current_time - start_time
-            fps = frame_count / elapsed_time if elapsed_time > 0 else 0
-            print(f"\rFPS: {fps:.1f} | Frames: {frame_count} | Runtime: {elapsed_time:.1f}s", end="", flush=True)
+            fps = 1/(current_time - loop_start)
+            print(f"\rFPS: {fps:.2f} | Frames: {frame_count}", end="", flush=True)
             last_fps_print = current_time
         
         await asyncio.sleep(1/30)  # ~30 FPS for smoother streaming
