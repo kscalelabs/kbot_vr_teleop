@@ -9,7 +9,7 @@ from kscale_vr_teleop.udp_conn import UDPHandler, RLUDPHandler
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop._assets import ASSETS_DIR
 
-urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
+urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
 urdf_logger = URDFLogger(urdf_path)
 
 
@@ -48,7 +48,7 @@ rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), stat
 
 udp_handler = UDPHandler("127.0.0.1", 8888)
 
-ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
+ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
 err = []
 @profile

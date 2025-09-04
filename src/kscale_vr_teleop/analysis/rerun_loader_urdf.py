@@ -102,7 +102,7 @@ class URDFLogger:
             origin_transform[:3, 3] = base_trans
             rr.log(self.root_path + entity_path[:-len('/link')], rr.Transform3D(translation=origin_transform[:3, 3], mat3x3=origin_transform[:3, :3]), static=True)
             joint_axis = joint.axis if joint.axis is not None else [1, 0, 0]
-            rr.log(self.root_path + entity_path, rr.Transform3D(rotation_axis_angle=RotationAxisAngle(joint_axis, Angle(angle))))
+            rr.log(self.root_path + entity_path, rr.Transform3D.from_fields(quaternion=st.Rotation.from_rotvec(np.array(joint_axis) * angle).as_quat()))
             self.joint_transform_set.add(entity_path)
         else:
             joint_axis = joint.axis if joint.axis is not None else [1, 0, 0]

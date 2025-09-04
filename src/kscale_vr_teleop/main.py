@@ -17,7 +17,7 @@ from pathlib import Path
 from line_profiler import profile
 import warnings
 
-urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
+urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
 
 SEND_EE_CONTROL = False
 VISUALIZE = bool(os.environ.get("VISUALIZE", False))
@@ -83,7 +83,7 @@ base_to_head_transform[:3,3] = np.array([
 	0, 0, 0.25
 ])
 
-ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
+ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
 @profile
 async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
@@ -109,6 +109,11 @@ async def stream_cameras(session: VuerSession, left_src=0, right_src=1):
         # left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, hand_target_left, hand_target_right)
 
         joints = ik_solver.inverse_kinematics(np.array([hand_target_right, hand_target_left]))
+        # Convert JAX array to NumPy for faster slicing operations
+        joints = np.asarray(joints)
+        actual_positions = ik_solver.forward_kinematics(joints)
+        rr.log('actual_right', rr.Transform3D(translation=actual_positions[0][:3, 3], mat3x3=actual_positions[0][:3, :3], axis_length=0.1))
+        rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
         left_arm_joints = joints[1::2]
         right_arm_joints = joints[::2]
         left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
