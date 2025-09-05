@@ -110,14 +110,14 @@ async def control_arms(session: VuerSession):
         rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
         left_arm_joints = joints[1::2]
         right_arm_joints = joints[::2]
-        fingers_distance = np.linalg.norm(right_finger_poses[8,:3,3] - right_finger_poses[3,:3,3])
-        finger_spacing = np.clip(fingers_distance/0.15, 0, 1)
-        gripper_torque = finger_spacing*-0.1 + 1# 1 -> -0.1, 0->1
-        left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
+        right_finger_spacing = np.linalg.norm(right_finger_poses[8,:3,3] - right_finger_poses[3,:3,3])
+        right_gripper_joint = np.clip(right_finger_spacing/0.15, 0, 1)
+        left_finger_spacing = np.linalg.norm(left_finger_poses[8,:3,3] - left_finger_poses[3,:3,3])
+        left_gripper_joint = np.clip(left_finger_spacing/0.15, 0, 1)
         if SEND_EE_CONTROL:
             udp_handler._send_udp(hand_target_left, hand_target_right)
         else:
-            handler.send_commands(right_arm_joints, left_arm_joints)
+            handler.send_commands(right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint])
 
         if VISUALIZE:
             new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
