@@ -93,6 +93,7 @@ if __name__ == "__main__":
     start = time.time()
     while True:
         t = time.time() - start
-        pos1 = 0.5*np.sin(t)
-        cmdr.send_commands(np.deg2rad([0, -15, 0, 90, 0, 0, pos1]), np.deg2rad([0, 15, 0, -90, 0]))
+        gripper_pos = 0.068*0.5*(1+np.sin(t))
+        cmdr.send_commands(np.deg2rad([0, -15, 0, 90, 0])+ [gripper_pos], np.deg2rad([0, 15, 0, -90, 0])+ [gripper_pos])
+        print(f"Sent command at t={t:.2f}s, gripper={gripper_pos:.3f}", end='\r')
         time.sleep(0.01)
