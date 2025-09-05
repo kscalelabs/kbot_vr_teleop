@@ -78,8 +78,9 @@ class Commander16:
         self.cmds.RElbowPitch = float(right_arm_angles[2])
         self.cmds.RElbowRoll = float(right_arm_angles[3])
         self.cmds.RWristRoll = float(right_arm_angles[4])
-        self.cmds.RWristYaw = float(right_arm_angles[5])
-        self.cmds.RWristPitch = float(right_arm_angles[6])
+        if len(right_arm_angles) > 5:
+            self.cmds.RWristYaw = float(right_arm_angles[5])
+            self.cmds.RWristPitch = float(right_arm_angles[6])
 
         self.sock.sendto(self.cmds.to_msg(), (self.UDP_IP, self.UDP_PORT)) # This line takes a non-trivial amount of time (8e-4s on a *desktop*)
 
