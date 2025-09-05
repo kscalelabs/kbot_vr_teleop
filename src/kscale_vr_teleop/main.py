@@ -17,7 +17,7 @@ from pathlib import Path
 from line_profiler import profile
 import warnings
 
-urdf_path  = str(ASSETS_DIR / "kbot_legless_7dof" / "robot.urdf")
+urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
 
 SEND_EE_CONTROL = False
 VISUALIZE = bool(os.environ.get("VISUALIZE", False))
