@@ -83,7 +83,7 @@ base_to_head_transform[:3,3] = np.array([
 	0, 0, 0.25
 ])
 
-ik_solver = RobotInverseKinematics(urdf_path, ['pitch_yoke_drive', 'pitch_yoke_drive_2'], 'base')
+ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
 @profile
 async def control_arms(session: VuerSession):
