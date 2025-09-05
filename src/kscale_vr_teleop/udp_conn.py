@@ -47,7 +47,7 @@ class UDPHandler:
                 for key, value in data.items():
                     log_rerun_scalars(value, parent_key=f"{parent_key}.{key}" if parent_key else key)
             else:
-                rr.log(parent_key, rr.Scalar(data), static=True)
+                rr.log(parent_key, rr.Scalars(data), static=True)
 
         log_rerun_scalars(payload)
 
@@ -87,7 +87,7 @@ class RLUDPHandler:
                 for key, value in data.items():
                     log_rerun_scalars(value, parent_key=f"{parent_key}.{key}" if parent_key else key)
             else:
-                rr.log(parent_key, rr.Scalar(data), static=True)
+                rr.log(parent_key, rr.Scalars(data), static=True)
 
         log_rerun_scalars(payload)
 
