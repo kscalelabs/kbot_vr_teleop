@@ -149,12 +149,12 @@ class RobotInverseKinematics:
             left_ee_position = end_effector_mats[1]
             right_wrist_mat = transform_targets[0]
             left_wrist_mat = transform_targets[1]
-            right_ee_forward = right_ee_position[:3,2]
-            left_ee_forward = left_ee_position[:3,2]
+            right_ee_forward = -right_ee_position[:3,1]
+            left_ee_forward = -left_ee_position[:3,1]
             right_target_forward = -right_wrist_mat[:3, 2]
             left_target_forward = -left_wrist_mat[:3, 2]
-            right_ee_up = right_ee_position[:3, 1]
-            left_ee_up = left_ee_position[:3, 1]
+            right_ee_up = right_ee_position[:3, 0]
+            left_ee_up = left_ee_position[:3, 0]
             right_target_up = -right_wrist_mat[:3,0] # towards the thumb
             left_target_up = left_wrist_mat[:3,0]
             
@@ -188,7 +188,7 @@ class RobotInverseKinematics:
             fun=self.residuals,
             method='trf',
             options={
-                'jac_sparsity': jac_sparsity_mat,
+                # 'jac_sparsity': jac_sparsity_mat,
                 'xtol': 1e-3,
                 'gtol': 1e-3,
                 'ftol': 1e-3,

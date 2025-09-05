@@ -17,7 +17,7 @@ from pathlib import Path
 from line_profiler import profile
 import warnings
 
-urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
+urdf_path  = str(ASSETS_DIR / "kbot_legless_7dof" / "robot.urdf")
 
 SEND_EE_CONTROL = False
 VISUALIZE = bool(os.environ.get("VISUALIZE", False))
@@ -83,7 +83,7 @@ base_to_head_transform[:3,3] = np.array([
 	0, 0, 0.25
 ])
 
-ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
+ik_solver = RobotInverseKinematics(urdf_path, ['pitch_yoke_drive', 'pitch_yoke_drive_2'], 'base')
 
 @profile
 async def control_arms(session: VuerSession):
@@ -95,6 +95,9 @@ async def control_arms(session: VuerSession):
         frame_count += 1
         hand_target_left = base_to_head_transform @ left_wrist_pose
         hand_target_right = base_to_head_transform @ right_wrist_pose
+        # clamp hand targets z coordinate to be above -0.2
+        hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.2)
+        hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.2)
         rr.log('hand_target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.05))
         rr.log('hand_target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.05))
         # left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, hand_target_left, hand_target_right)
@@ -108,7 +111,8 @@ async def control_arms(session: VuerSession):
         left_arm_joints = joints[1::2]
         right_arm_joints = joints[::2]
         fingers_distance = np.linalg.norm(right_finger_poses[8,:3,3] - right_finger_poses[3,:3,3])
-        gripper_pos = np.clip(fingers_distance/0.15, 0, 1)
+        finger_spacing = np.clip(fingers_distance/0.15, 0, 1)
+        gripper_torque = finger_spacing*-0.1 + 1# 1 -> -0.1, 0->1
         left_finger_joints, right_finger_joints = calculate_hand_joints_no_ik(left_finger_poses, right_finger_poses)
         if SEND_EE_CONTROL:
             udp_handler._send_udp(hand_target_left, hand_target_right)
