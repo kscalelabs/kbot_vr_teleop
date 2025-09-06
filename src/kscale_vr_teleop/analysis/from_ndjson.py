@@ -24,83 +24,66 @@ import rerun as rr
 
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from kscale_vr_teleop._assets import ASSETS_DIR
+import warnings
 
 
 def _log_numeric_array(name: str, arr):
-	"""Convenience: log lists/arrays of numbers as rr.Scalars."""
-	try:
-		a = np.asarray(arr, dtype=float)
-	except Exception:
-		return
-	# For vectors we log the whole vector as Scalars (Rerun will show it as a
-	# time-series / multi-scalar). For single-value arrays this still works.
-	rr.log(name, rr.Scalars(a))
+    """Convenience: log lists/arrays of numbers as rr.Scalars."""
+    try:
+        a = np.asarray(arr, dtype=float)
+    except Exception:
+        return
+    # For vectors we log the whole vector as Scalars (Rerun will show it as a
+    # time-series / multi-scalar). For single-value arrays this still works.
+    rr.log(name, rr.Scalars(a))
 
 
 def main():
-	parser = argparse.ArgumentParser(description="Replay ndjson robot logs to Rerun")
-	parser.add_argument("filepath", type=str, help="Path to ndjson file (one JSON object per line)")
-	parser.add_argument("--urdf", type=str, default=str(ASSETS_DIR / "kbot_legless" / "robot.urdf"), help="Path to URDF file to visualize")
-	parser.add_argument("--recording-id", type=str, default=None)
-	args = parser.parse_args()
+    parser = argparse.ArgumentParser(description="Replay ndjson robot logs to Rerun")
+    parser.add_argument("filepath", type=str, help="Path to ndjson file (one JSON object per line)")
+    parser.add_argument("--urdf", type=str, default=str(ASSETS_DIR / "kbot_legless" / "robot.urdf"), help="Path to URDF file to visualize")
+    parser.add_argument("--recording-id", type=str, default=None)
+    args = parser.parse_args()
 
-	rr.init("replay_from_ndjson", recording_id=args.recording_id, spawn=True)
-	rr.stdout()
+    rr.init("replay_from_ndjson", recording_id=args.recording_id, spawn=True)
+    rr.stdout()
 
-	urdf_logger = URDFLogger(args.urdf)
+    urdf_logger = URDFLogger(args.urdf)
 
-	p = Path(args.filepath)
-	if not p.exists():
-		raise SystemExit(f"ndjson file not found: {p}")
+    p = Path(args.filepath)
+    if not p.exists():
+        raise SystemExit(f"ndjson file not found: {p}")
 
-	# We log each record in sequence. The URDFLogger accepts a list/tuple of
-	# joint angles (in the order of the URDF joints) or a dict mapping joint
-	# name -> angle.
-	with p.open("r") as fh:
-		for i, line in enumerate(tqdm(fh, desc="records")):
-			line = line.strip()
-			if not line:
-				continue
-			try:
-				rec = json.loads(line)
-			except json.JSONDecodeError:
-				# skip malformed lines
-				continue
+    # We log each record in sequence. The URDFLogger accepts a list/tuple of
+    # joint angles (in the order of the URDF joints) or a dict mapping joint
+    # name -> angle.
+    with p.open("r") as fh:
+        for i, line in enumerate(tqdm(fh, desc="records")):
+            line = line.strip()
+            if not line:
+                warnings.warn(f"Skipping malformed line {i}")
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                # skip malformed lines
+                warnings.warn(f"Skipping malformed JSON line {i}")
+                continue
 
-			# timestamps are in microseconds; convert to seconds and set Rerun time
-			t_raw = rec.get("t_us")
-			rr.set_time("my_timeline", timestamp=t_raw/1e6)
+            # timestamps are in microseconds; convert to seconds and set Rerun time
+            t_raw = rec.get("t_us")
+            rr.set_time("my_timeline", timestamp=t_raw/1e6)
 
-			# joint angles -> robot pose
-			joints = rec.get("joint_angles") or rec.get("joint_positions")
-			if joints is not None:
-				# normalize to plain Python list of floats
-				try:
-					joint_list = [float(x) for x in joints]
-				except Exception:
-					joint_list = None
+            # joint angles -> robot pose
+            joints = rec.get("joint_angles")
 
-				if joint_list is not None:
-					urdf_logger.log(joint_list)
+            
 
-			# commands and other numeric arrays -- log under their keys
-			for key in ["command", "output", "joint_torques", "joint_vels", "joint_amps", "joint_temps"]:
-				if key in rec and rec[key] is not None:
-					_log_numeric_array(key, rec[key])
-
-			# also log any simple numeric scalars present at top-level
-			for scalar_key in ["step_id", "initial_heading"]:
-				if scalar_key in rec and rec[scalar_key] is not None:
-					try:
-						rr.log(scalar_key, rr.Scalars(float(rec[scalar_key])))
-					except Exception:
-						pass
-
-	print("Done")
+    print("Done")
 
 
 if __name__ == "__main__":
-	main()
+    main()
 
 import json
 
