@@ -85,6 +85,7 @@ base_to_head_transform[:3,3] = np.array([
 
 ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
+
 @profile
 async def control_arms(session: VuerSession):
     frame_count = 0
@@ -108,8 +109,8 @@ async def control_arms(session: VuerSession):
         actual_positions = ik_solver.forward_kinematics(joints)
         rr.log('actual_right', rr.Transform3D(translation=actual_positions[0][:3, 3], mat3x3=actual_positions[0][:3, :3], axis_length=0.1))
         rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
-        left_arm_joints = joints[1::2]
-        right_arm_joints = joints[::2]
+        left_arm_joints = joints[5:]
+        right_arm_joints = joints[:5]
         right_finger_spacing = np.linalg.norm(right_finger_poses[8,:3,3] - right_finger_poses[3,:3,3])
         right_gripper_joint = np.clip(right_finger_spacing/0.15, 0, 1)
         left_finger_spacing = np.linalg.norm(left_finger_poses[8,:3,3] - left_finger_poses[3,:3,3])
@@ -120,8 +121,8 @@ async def control_arms(session: VuerSession):
             handler.send_commands(right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint])
 
         if VISUALIZE:
-            new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
-            new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[1::2])})
+            new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[:5])}
+            new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[5:])})
             urdf_logger.log(new_config)
 
         # Print FPS every second using carriage return for clean output

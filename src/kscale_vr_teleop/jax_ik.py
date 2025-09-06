@@ -24,8 +24,17 @@ class RobotInverseKinematics:
             for (joint_name, child_link_name) in child_info_list:
                 kinematic_chain_maps[child_link_name] = kinematic_chain_maps[link_name] + [joint_name]
 
-        self.active_joints = [
-            j for j in self.urdf.joints if j.joint_type != 'fixed'
+        self.active_joints = [ # TODO: un-harcode this
+            'dof_right_shoulder_pitch_02',
+            'dof_right_shoulder_roll_03',
+            'dof_right_shoulder_yaw_02',
+            'dof_right_elbow_02',
+            'dof_right_wrist_00',
+            'dof_left_shoulder_pitch_02',
+            'dof_left_shoulder_roll_03',
+            'dof_left_shoulder_yaw_02',
+            'dof_left_elbow_02',
+            'dof_left_wrist_00'
         ]
 
         # Create mapping from joint name to active joint index
