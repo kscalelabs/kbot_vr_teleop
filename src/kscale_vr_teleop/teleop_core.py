@@ -33,6 +33,7 @@ class TeleopCore:
 
         self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
         self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
+        self.log_joint_angles(np.zeros(5), np.zeros(5))
 
     def update_head(self, matrix: np.ndarray):
         self.head_matrix = matrix
