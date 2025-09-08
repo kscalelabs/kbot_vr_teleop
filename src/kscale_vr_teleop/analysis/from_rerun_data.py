@@ -79,8 +79,8 @@ def main():
 
         # left_arm_joints, right_arm_joints = calculate_arm_joints(np.eye(4), np.eye(4), frame_mat)
         joints = ik_solver.inverse_kinematics(np.array([right_wrist_frame, left_wrist_frame]))
-        left_arm_joints = joints[1::2]
-        right_arm_joints = joints[::2]
+        left_arm_joints = joints[5:]
+        right_arm_joints = joints[:5]
 
         new_config = {k: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
         new_config.update({k: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[1::2])})
