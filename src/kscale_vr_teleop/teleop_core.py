@@ -5,6 +5,7 @@ from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop.command_conn import Commander16
 from kscale_vr_teleop.udp_conn import UDPHandler
 import rerun as rr
+from line_profiler import profile
 
 class TeleopCore:
     def __init__(self, udp_host='localhost', udp_port=10000):
@@ -53,6 +54,7 @@ class TeleopCore:
         new_config.update({k: left_arm[i] for i, k in enumerate(self.ik_solver.active_joints[5:])})
         self.urdf_logger.log(new_config)
 
+    @profile
     def compute_joint_angles(self):
         '''
         Returns (right_arm_joints, left_arm_joints)
