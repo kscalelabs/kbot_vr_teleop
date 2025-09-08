@@ -25,12 +25,12 @@ class RobotInverseKinematics:
                 kinematic_chain_maps[child_link_name] = kinematic_chain_maps[link_name] + [joint_name]
 
         self.active_joints = [ # TODO: un-harcode this
-            'dof_right_shoulder_pitch_02',
+            'dof_right_shoulder_pitch_03',
             'dof_right_shoulder_roll_03',
             'dof_right_shoulder_yaw_02',
             'dof_right_elbow_02',
             'dof_right_wrist_00',
-            'dof_left_shoulder_pitch_02',
+            'dof_left_shoulder_pitch_03',
             'dof_left_shoulder_roll_03',
             'dof_left_shoulder_yaw_02',
             'dof_left_elbow_02',
@@ -40,7 +40,7 @@ class RobotInverseKinematics:
         # Create mapping from joint name to active joint index
         self.active_joint_indices = {}
         for i, joint in enumerate(self.active_joints):
-            self.active_joint_indices[joint.name] = i
+            self.active_joint_indices[joint] = i
 
         upper_bounds = []
         lower_bounds = []
