@@ -7,23 +7,17 @@ from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
 from kscale_vr_teleop.udp_conn import RLUDPHandler
 from kscale_vr_teleop.util import fast_mat_inv
 import time
-from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
+from kscale_vr_teleop.teleop_core import TeleopCore
 import os
 
-from kscale_vr_teleop.jax_ik import RobotInverseKinematics
-from kscale_vr_teleop._assets import ASSETS_DIR
-from kscale_vr_teleop.command_conn import Commander16
 from pathlib import Path
 from line_profiler import profile
 import warnings
 
-urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
 
 SEND_EE_CONTROL = False
 VISUALIZE = bool(os.environ.get("VISUALIZE", False))
 UDP_HOST = "127.0.0.1"  # change if needed
-
-urdf_logger = URDFLogger(urdf_path)
 
 import rerun as rr
 
@@ -51,40 +45,9 @@ hand_vuer_to_urdf_frame[:3,:3] = np.array([
 cam_mat = np.array([[266.61728276,0.,643.83126137],[0.,266.94450686,494.81811813],[0.,0.,1.,]])
 dist_coeffs = np.array([[-6.07417419e-02,9.95447444e-02,-2.26448001e-04,1.22881804e-03,3.42134205e-03,1.45361886e-01,8.03248099e-02,2.11170107e-02,-3.80620047e-03,2.48350591e-05,-8.33565666e-04,2.97806723e-05]])
 
-head_matrix = np.eye(4, dtype=np.float32)
-right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
-left_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
-right_wrist_pose = np.eye(4,dtype=np.float32)
-left_wrist_pose = np.eye(4,dtype=np.float32)
-left_wrist_pose[:3,3] = np.array([0.2, 0.2, -0.4])
-right_wrist_pose[:3,3] = np.array([0.2, -0.2, -0.4])
-default_wrist_rotation = np.array([
-    [0, 0, -1],
-    [-1, 0, 0],
-    [0, 1, 0]
-])
-left_wrist_pose[:3,:3] = default_wrist_rotation
-right_wrist_pose[:3,:3] = default_wrist_rotation
-wrist_index = 0
-if SEND_EE_CONTROL:
-    udp_handler = RLUDPHandler(UDP_HOST)
-else:
-    # udp_handler = UDPHandler(UDP_HOST, 8888)
-    # udp_handler = KOSHandler()
-    handler = Commander16()
-
-left_arm_joints = np.zeros(5)
-right_arm_joints = np.zeros(5)
+teleop_core = TeleopCore()
 
 STREAM = bool(os.environ.get("STREAM", False))
-
-base_to_head_transform = np.eye(4)
-base_to_head_transform[:3,3] = np.array([
-	0, 0, 0.25
-])
-
-ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
-
 
 @profile
 async def control_arms(session: VuerSession):
@@ -94,36 +57,10 @@ async def control_arms(session: VuerSession):
     while True:
         loop_start = time.time()
         frame_count += 1
-        hand_target_left = base_to_head_transform @ left_wrist_pose
-        hand_target_right = base_to_head_transform @ right_wrist_pose
-        # clamp hand targets z coordinate to be above -0.2
-        hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.2)
-        hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.2)
-        rr.log('hand_target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.05))
-        rr.log('hand_target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.05))
-        # left_arm_joints, right_arm_joints = calculate_arm_joints(head_matrix, hand_target_left, hand_target_right)
-
-        joints = ik_solver.inverse_kinematics(np.array([hand_target_right, hand_target_left]))
-        # Convert JAX array to NumPy for faster slicing operations
-        joints = np.asarray(joints)
-        actual_positions = ik_solver.forward_kinematics(joints)
-        rr.log('actual_right', rr.Transform3D(translation=actual_positions[0][:3, 3], mat3x3=actual_positions[0][:3, :3], axis_length=0.1))
-        rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
-        left_arm_joints = joints[5:]
-        right_arm_joints = joints[:5]
-        right_finger_spacing = np.linalg.norm(right_finger_poses[8,:3,3] - right_finger_poses[3,:3,3])
-        right_gripper_joint = np.clip(right_finger_spacing/0.15, 0, 1)
-        left_finger_spacing = np.linalg.norm(left_finger_poses[8,:3,3] - left_finger_poses[3,:3,3])
-        left_gripper_joint = np.clip(left_finger_spacing/0.15, 0, 1)
-        if SEND_EE_CONTROL:
-            udp_handler._send_udp(hand_target_left, hand_target_right)
-        else:
-            handler.send_commands(right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint])
-
+        
+        right_arm_joints, left_arm_joints = teleop_core.compute_joint_angles()
         if VISUALIZE:
-            new_config = {k: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[:5])}
-            new_config.update({k: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[5:])})
-            urdf_logger.log(new_config)
+            teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
 
         # Print FPS every second using carriage return for clean output
         current_time = time.time()
@@ -210,28 +147,27 @@ if __name__ == "__main__":
     @app.add_handler("CAMERA_MOVE")
     async def on_cam_move(event, session):
         head_matrix_shared = np.array(event.value["camera"]["matrix"], dtype=np.float32).reshape(4, 4)
-        head_matrix[:] = kbot_vuer_to_urdf_frame @ head_matrix_shared.T
-        rr.log('head', rr.Transform3D(translation=np.zeros(3), mat3x3=head_matrix[:3, :3], axis_length=0.05))
+        teleop_core.head_matrix[:] = kbot_vuer_to_urdf_frame @ head_matrix_shared.T
+        rr.log('head', rr.Transform3D(translation=np.zeros(3), mat3x3=teleop_core.head_matrix[:3, :3], axis_length=0.05))
 
     @app.add_handler("HAND_MOVE")
     async def hand_move_handler(event, session):
-        global left_wrist_pose, right_wrist_pose, left_finger_poses, right_finger_poses
         if event.key == 'hands':
             if 'leftState' in event.value and event.value['leftState']:
                 left_mat_raw = event.value['left']
-                left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
-                left_wrist_pose[:] = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
-                left_wrist_pose[:3, 3] -= head_matrix[:3, 3]
-                left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
-                rr.log('left_wrist', rr.Transform3D(translation=left_wrist_pose[:3, 3], mat3x3=left_wrist_pose[:3, :3], axis_length=0.05))
+                left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
+                teleop_core.left_wrist_pose[:] = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
+                teleop_core.left_wrist_pose[:3,3] -= teleop_core.head_matrix[:3,3]
+                teleop_core.left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
+                rr.log('left_wrist', rr.Transform3D(translation=teleop_core.left_wrist_pose[:3, 3], mat3x3=teleop_core.left_wrist_pose[:3, :3], axis_length=0.05))
 
             if 'rightState' in event.value and event.value['rightState']:
                 right_mat_raw = event.value['right']
-                right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25, 4, 4).transpose((0,2,1))
-                right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
-                right_wrist_pose[:3, 3] -= head_matrix[:3, 3]
-                right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
-                rr.log('right_wrist', rr.Transform3D(translation=right_wrist_pose[:3, 3], mat3x3=right_wrist_pose[:3, :3], axis_length=0.05))
+                right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
+                teleop_core.right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
+                teleop_core.right_wrist_pose[:3,3] -= teleop_core.head_matrix[:3,3]
+                teleop_core.right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
+                rr.log('right_wrist', rr.Transform3D(translation=teleop_core.right_wrist_pose[:3, 3], mat3x3=teleop_core.right_wrist_pose[:3, :3], axis_length=0.05))
     try:
         @app.spawn(start=True)
         async def main(session: VuerSession):

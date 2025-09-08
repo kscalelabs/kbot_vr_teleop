@@ -4,7 +4,7 @@ import websockets
 import socket
 from typing import Dict, Optional
 import logging
-from kinematics import kinematics
+from kscale_vr_teleop.kinematics import handle_hand_tracking
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -12,31 +12,6 @@ logger = logging.getLogger(__name__)
 TELEOP_HOST = "10.33.13.62"
 TELEOP_PORT = 8888
 
-class TeleopUDPHandler:
-    """UDP handler for forwarding teleop messages"""
-    def __init__(self, udp_host: str, udp_port: int):
-        self.udp_host = udp_host
-        self.udp_port = udp_port
-        self._udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._udp_sock.setblocking(False)
-        
-        # Increase send buffer size to handle bursts
-        self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # 64KB
-        
-        # Set socket priority (if supported)
-        try:
-            self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)  # High priority
-        except:
-            pass  # Not all systems support this
-        # Enable broadcast (useful for some network setups)
-        self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    
-    def send_udp_message(self, message: str):
-        """Send message over UDP"""
-        try:
-            self._udp_sock.sendto(message.encode("utf-8"), (self.udp_host, self.udp_port))
-        except Exception as e:
-            logger.error(f"Failed to send UDP message: {e}")
 
 class RobotAppPair:
     def __init__(self, robot_id: str, robot_ws):
@@ -75,7 +50,6 @@ pairs: Dict[str, RobotAppPair] = {}
 pairs_lock = asyncio.Lock()
 
 # Global UDP handler for teleop messages
-teleop_udp_handler = TeleopUDPHandler(TELEOP_HOST, TELEOP_PORT)
 
 async def handle_robot(websocket, robot_id: str):
     """Handle robot connection"""
@@ -155,11 +129,7 @@ async def handle_teleop(websocket, robot_id: str):
                 data = json.loads(message)
                 
                 # Process through kinematics if needed
-                processed_data = kinematics(data)
-                
-                # Forward the processed message over UDP
-                udp_message = json.dumps(processed_data)
-                teleop_udp_handler.send_udp_message(udp_message)
+                handle_hand_tracking(data)
                 
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
                 
