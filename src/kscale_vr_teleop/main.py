@@ -121,8 +121,8 @@ async def control_arms(session: VuerSession):
             handler.send_commands(right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint])
 
         if VISUALIZE:
-            new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[:5])}
-            new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[5:])})
+            new_config = {k: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[:5])}
+            new_config.update({k: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[5:])})
             urdf_logger.log(new_config)
 
         # Print FPS every second using carriage return for clean output
