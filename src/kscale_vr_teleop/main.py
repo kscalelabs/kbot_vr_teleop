@@ -27,6 +27,9 @@ logs_path = logs_folder / f'{time.strftime("%H-%M-%S")}.rrd'
 
 rr.init("vr_teleop", spawn=VISUALIZE)
 
+print("Saving logs to", logs_path)
+rr.save(logs_path)
+
 rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
 kbot_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
 kbot_vuer_to_urdf_frame[:3,:3] = np.array([
@@ -170,25 +173,21 @@ if __name__ == "__main__":
                 new_right_finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
                 teleop_core.update_right_hand(new_right_wrist_pose, new_right_finger_poses)
                 rr.log('right_wrist', rr.Transform3D(translation=teleop_core.right_wrist_pose[:3, 3], mat3x3=teleop_core.right_wrist_pose[:3, :3], axis_length=0.05))
-    try:
-        @app.spawn(start=True)
-        async def main(session: VuerSession):
-            session.upsert(
-                Hands(
-                    stream=True,
-                    key="hands",
-                    hideLeft=False,       # hides the hand, but still streams the data.
-                    hideRight=False,      # hides the hand, but still streams the data.
-                ),
-                to="bgChildren",
-            )
-            tasks = [
-                stream_cameras(session),
-                control_arms(session)
-            ]
+    @app.spawn(start=True)
+    async def main(session: VuerSession):
+        session.upsert(
+            Hands(
+                stream=True,
+                key="hands",
+                hideLeft=False,       # hides the hand, but still streams the data.
+                hideRight=False,      # hides the hand, but still streams the data.
+            ),
+            to="bgChildren",
+        )
+        tasks = [
+            stream_cameras(session),
+            control_arms(session)
+        ]
 
-            await asyncio.gather(*tasks)
-    finally:
-        print("Saving logs to", logs_path)
-        rr.save(logs_path)
+        await asyncio.gather(*tasks)
     app.run()
