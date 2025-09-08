@@ -62,8 +62,7 @@ async def control_arms(session: VuerSession):
         frame_count += 1
         
         right_arm_joints, left_arm_joints = teleop_core.compute_joint_angles()
-        if VISUALIZE:
-            teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
+        teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
         teleop_core.send_kinfer_commands(right_arm_joints, left_arm_joints)
 
         # Print FPS every second using carriage return for clean output
