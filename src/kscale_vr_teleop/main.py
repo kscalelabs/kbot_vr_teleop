@@ -156,36 +156,38 @@ if __name__ == "__main__":
             if 'leftState' in event.value and event.value['leftState']:
                 left_mat_raw = event.value['left']
                 left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
-                teleop_core.left_wrist_pose[:] = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
-                teleop_core.left_wrist_pose[:3,3] -= teleop_core.head_matrix[:3,3]
-                teleop_core.left_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
+                new_left_wrist_pose = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
+                new_left_wrist_pose[:3,3] -= teleop_core.head_matrix[:3,3]
+                new_left_finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
+                teleop_core.update_left_hand(new_left_wrist_pose, new_left_finger_poses)
                 rr.log('left_wrist', rr.Transform3D(translation=teleop_core.left_wrist_pose[:3, 3], mat3x3=teleop_core.left_wrist_pose[:3, :3], axis_length=0.05))
 
             if 'rightState' in event.value and event.value['rightState']:
                 right_mat_raw = event.value['right']
                 right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
-                teleop_core.right_wrist_pose[:] = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
-                teleop_core.right_wrist_pose[:3,3] -= teleop_core.head_matrix[:3,3]
-                teleop_core.right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
+                new_right_wrist_pose = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
+                new_right_wrist_pose[:3,3] -= teleop_core.head_matrix[:3,3]
+                new_right_finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
+                teleop_core.update_right_hand(new_right_wrist_pose, new_right_finger_poses)
                 rr.log('right_wrist', rr.Transform3D(translation=teleop_core.right_wrist_pose[:3, 3], mat3x3=teleop_core.right_wrist_pose[:3, :3], axis_length=0.05))
     try:
         @app.spawn(start=True)
         async def main(session: VuerSession):
-                session.upsert(
-                    Hands(
-                        stream=True,
-                        key="hands",
-                        hideLeft=False,       # hides the hand, but still streams the data.
-                        hideRight=False,      # hides the hand, but still streams the data.
-                    ),
-                    to="bgChildren",
-                )
-                tasks = [
-                    stream_cameras(session),
-                    control_arms(session)
-                ]
+            session.upsert(
+                Hands(
+                    stream=True,
+                    key="hands",
+                    hideLeft=False,       # hides the hand, but still streams the data.
+                    hideRight=False,      # hides the hand, but still streams the data.
+                ),
+                to="bgChildren",
+            )
+            tasks = [
+                stream_cameras(session),
+                control_arms(session)
+            ]
 
-                await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
     finally:
         print("Saving logs to", logs_path)
         rr.save(logs_path)
