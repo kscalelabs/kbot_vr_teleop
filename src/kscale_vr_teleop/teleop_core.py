@@ -70,9 +70,9 @@ class TeleopCore:
         joints = self.ik_solver.inverse_kinematics(np.array([hand_target_right, hand_target_left]))
         # Convert JAX array to NumPy for faster slicing operations
         joints = np.asarray(joints)
-        actual_positions = self.ik_solver.forward_kinematics(joints)
-        rr.log('actual_right', rr.Transform3D(translation=actual_positions[0][:3, 3], mat3x3=actual_positions[0][:3, :3], axis_length=0.1))
-        rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
+        # actual_positions = self.ik_solver.forward_kinematics(joints)
+        # rr.log('actual_right', rr.Transform3D(translation=actual_positions[0][:3, 3], mat3x3=actual_positions[0][:3, :3], axis_length=0.1))
+        # rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
         left_arm_joints = joints[5:]
         right_arm_joints = joints[:5]
         right_finger_spacing = np.linalg.norm(self.right_finger_poses[8,:3,3] - self.right_finger_poses[3,:3,3])
