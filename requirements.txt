@@ -1,0 +1,14 @@
+jax
+jaxopt
+line_profiler
+numpy
+opencv_python
+Pillow
+polars
+rerun-sdk
+scipy
+urdf_parser_py
+tqdm
+trimesh
+urdfdom_py
+vuer[all]
