@@ -95,7 +95,7 @@
     <axis xyz="0 0 1"/>
   </joint>
   <joint name="dof_left_wrist_00" type="revolute">
-    <origin xyz="0.017350 -0.103000 0.018000" rpy="1.570796 0 0"/>
+    <origin xyz="0.017350 -0.103000 0.018000" rpy="1.570796 3.141592 0"/>
     <parent link="KC_C_401L_Up_Forearm_Drive"/>
     <child link="PRT0001_2"/>
     <limit effort="14" velocity="27.227" lower="-1.378810" upper="1.378810"/>

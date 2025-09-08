@@ -40,11 +40,13 @@ class TeleopCore:
     def update_left_hand(self, wrist: np.ndarray, fingers: np.ndarray):
         self.left_wrist_pose = wrist
         self.left_finger_poses = fingers
+        rr.log('left_wrist', rr.Transform3D(translation=self.left_wrist_pose[:3, 3], mat3x3=self.left_wrist_pose[:3, :3], axis_length=0.05))
     
     def update_right_hand(self, wrist: np.ndarray, fingers: np.ndarray):
         self.right_wrist_pose = wrist
         self.right_finger_poses = fingers
-    
+        rr.log('right_wrist', rr.Transform3D(translation=self.right_wrist_pose[:3, 3], mat3x3=self.right_wrist_pose[:3, :3], axis_length=0.05))
+
     def log_joint_angles(self, right_arm: list, left_arm: list):
         new_config = {k: right_arm[i] for i, k in enumerate(self.ik_solver.active_joints[:5])}
         new_config.update({k: left_arm[i] for i, k in enumerate(self.ik_solver.active_joints[5:])})
@@ -57,6 +59,8 @@ class TeleopCore:
         hand_target_left = self.base_to_head_transform @ self.left_wrist_pose
         hand_target_right = self.base_to_head_transform @ self.right_wrist_pose
 
+        rr.log('target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.1))
+        rr.log('target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.1))
         # clamp hand targets z coordinate to be above -0.2
         hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.2)
         hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.2)
