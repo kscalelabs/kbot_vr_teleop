@@ -82,8 +82,8 @@ def main():
         left_arm_joints = joints[5:]
         right_arm_joints = joints[:5]
 
-        new_config = {k: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[::2])}
-        new_config.update({k: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[1::2])})
+        new_config = {k.name: right_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[:5])}
+        new_config.update({k.name: left_arm_joints[i] for i, k in enumerate(ik_solver.active_joints[5:])})
 
         rr.log('target_right', rr.Transform3D(translation=right_wrist_frame[:3,3], mat3x3=right_wrist_frame[:3,:3], axis_length=0.05))
         rr.log('target_left', rr.Transform3D(translation=left_wrist_frame[:3,3], mat3x3=left_wrist_frame[:3,:3], axis_length=0.05))
