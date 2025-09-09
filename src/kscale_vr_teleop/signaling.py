@@ -120,7 +120,6 @@ async def handle_app(websocket, robot_id: str):
 
 async def handle_teleop(websocket, robot_id: str):
     """Handle teleop connection - forwards messages over UDP"""
-    logger.info(f"Teleop {robot_id} connected - will forward to UDP {TELEOP_HOST}:{TELEOP_PORT}")
     
     # Send initial confirmation to teleop client  
     try:
