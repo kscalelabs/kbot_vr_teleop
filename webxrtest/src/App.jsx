@@ -5,7 +5,7 @@ import Billboard from './Billboard.tsx';
 
 function App() {
   const portString = window.location.port ? `:${window.location.port}` : '';
-  const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}`);
+  const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
   const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", or "billboard"
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams

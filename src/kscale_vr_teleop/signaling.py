@@ -179,9 +179,9 @@ async def handler(websocket):
     #     logger.error(f"Error in handler: {e}")
 
 async def main():
-    server = await websockets.serve(handler, "0.0.0.0", 8012, ping_interval=10,   # send a ping every 20s
+    server = await websockets.serve(handler, "0.0.0.0", 8013, ping_interval=10,   # send a ping every 20s
     ping_timeout=300 )
-    logger.info("Robot-App signaling server running on ws://0.0.0.0:8012")
+    logger.info("Robot-App signaling server running on ws://0.0.0.0:8013")
     
     try:
         await server.wait_closed()
