@@ -3,6 +3,7 @@ import json
 import ssl
 import websockets
 import os
+import argparse
 
 import gi
 gi.require_version('Gst', '1.0')
@@ -14,7 +15,7 @@ Gst.init(None)
 
 # WebSocket configuration
 # HOST_URL= "wss://c47174bc6ce1.ngrok-free.app"
-HOST_URL= "ws://localhost:8013"
+HOST_URL= "ws://10.33.13.51:8013"
 PIPELINE_DESC = '''
 webrtcbin name=sendrecv bundle-policy=max-bundle stun-server=stun://stun.l.google.com:19302
 '''
@@ -24,7 +25,7 @@ VIDEO_SOURCES = [
     "/base/axi/pcie@1000120000/rp1/i2c@88000/ov5647@36"
 ]
 
-AUDIO_SOURCE = "audiotestsrc"
+
 async def glib_main_loop_iteration():
     while True:
         # Process all pending GLib events without blocking
@@ -34,12 +35,13 @@ async def glib_main_loop_iteration():
         await asyncio.sleep(0.01)
 
 class WebRTCClient:
-    def __init__(self, loop):
+    def __init__(self, loop, flip_video=False):
         self.pipe = None
         self.webrtc = None
         self.ws = None  # WebSocket connection
         self.loop = loop
         self.added_data_channel = False
+        self.flip_video = flip_video
 
     def start_pipeline(self, active_cameras):
         print("Starting pipeline")
@@ -65,6 +67,13 @@ class WebRTCClient:
             capsfilter = Gst.ElementFactory.make("capsfilter", f"caps{i}")
             capsfilter.set_property("caps", caps)
             conv = Gst.ElementFactory.make("videoconvert", f"conv{i}")
+            
+            # Add videoflip element only if flip is enabled
+            if self.flip_video:
+                flip = Gst.ElementFactory.make("videoflip", f"flip{i}")
+                flip.set_property("method", 2)  # 2 = vertical flip
+                self.pipe.add(flip)
+            
             queue = Gst.ElementFactory.make("queue", f"queue{i}")
             queue.set_property("leaky", 1)
             queue.set_property("max-size-buffers", 1)
@@ -80,7 +89,13 @@ class WebRTCClient:
             self.pipe.add(pay)
             src.link(capsfilter)
             capsfilter.link(conv)
-            conv.link(queue)
+            
+            # Link through flip element if enabled, otherwise directly to queue
+            if self.flip_video:
+                conv.link(flip)
+                flip.link(queue)
+            else:
+                conv.link(queue)
             queue.link(vp8enc)
             vp8enc.link(pay)
             
@@ -189,8 +204,14 @@ class WebRTCClient:
                 self.pipe.set_state(Gst.State.NULL)
 
 async def main():
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='WebRTC Video Streaming Client')
+    parser.add_argument('--flip', action='store_true', 
+                       help='Vertically flip the video stream')
+    args = parser.parse_args()
+    
     loop = asyncio.get_running_loop()
-    client = WebRTCClient(loop)
+    client = WebRTCClient(loop, flip_video=args.flip)
     
     # Start the GLib main loop iteration task
     asyncio.create_task(glib_main_loop_iteration())
