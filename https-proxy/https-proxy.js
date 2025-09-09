@@ -12,7 +12,7 @@ const options = {
 };
 
 // Proxy for service on 8013 (mounted at /service2)
-const proxyTo8013 = createProxyMiddleware('/service2', {
+const proxyTo8013 = createProxyMiddleware({
   target: 'http://localhost:8013',
   changeOrigin: true,
   secure: false,
