@@ -41,7 +41,7 @@ else:
         print("Rerun visualization disabled - missing dependencies")
 
 class HandTrackingHandler:
-    def __init__(self, udp_host='localhost', udp_port=10000):
+    def __init__(self, udp_host='10.42.0.1', udp_port=10000):
         self.udp_host = udp_host
         self.udp_port = udp_port
 
