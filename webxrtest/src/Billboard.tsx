@@ -245,7 +245,7 @@ export default function Billboard({ stream, url }: BillboardProps) {
     await gl.makeXRCompatible();
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
 
-    const refSpace = await session.requestReferenceSpace('local');
+    const refSpace = await session.requestReferenceSpace('viewer');
     updateStatus('Reference space created, starting render loop...');
 
     // Setup WebSocket connection for hand tracking data
