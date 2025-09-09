@@ -26,10 +26,11 @@ if VISUALIZE:
     logs_folder.mkdir(parents=True, exist_ok=True)
     logs_path = logs_folder / f'{time.strftime("%H-%M-%S")}.rrd'
 
-    rr.init("vr_teleop", spawn=VISUALIZE)
+    rr.init("vr_teleop")
 
     print("Saving logs to", logs_path)
     rr.save(logs_path)
+    rr.spawn()
     
     # Set up coordinate system
     rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
