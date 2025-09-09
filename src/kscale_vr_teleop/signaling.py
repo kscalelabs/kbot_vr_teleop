@@ -10,9 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Hardcoded teleop UDP connection settings
-TELEOP_HOST = "10.33.13.62"
-TELEOP_PORT = 8888
-hand_tracking_handler = HandTrackingHandler(TELEOP_HOST, TELEOP_PORT)
+hand_tracking_handler = HandTrackingHandler()
 
 
 class RobotAppPair:
