@@ -22,12 +22,14 @@ VISUALIZE = bool(os.environ.get("VISUALIZE", True)) and RERUN_AVAILABLE
 
 if VISUALIZE:
     # Initialize Rerun
-    rr.init("kinematics_viz", spawn=True)
-    
-    # Set up logging directory
-    logs_folder = Path(f'~/.kinematics_logs/{time.strftime("%Y-%m-%d")}/').expanduser()
+    logs_folder = Path(f'~/.vr_teleop_logs/{time.strftime("%Y-%m-%d")}/').expanduser()
     logs_folder.mkdir(parents=True, exist_ok=True)
     logs_path = logs_folder / f'{time.strftime("%H-%M-%S")}.rrd'
+
+    rr.init("vr_teleop", spawn=VISUALIZE)
+
+    print("Saving logs to", logs_path)
+    rr.save(logs_path)
     
     # Set up coordinate system
     rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
@@ -61,5 +63,6 @@ class HandTrackingHandler:
             self.teleop_core.right_finger_poses[:] = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
 
         right_arm_joints, left_arm_joints = self.teleop_core.compute_joint_angles()
+        self.teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
 
         self.teleop_core.send_kinfer_commands(right_arm_joints, left_arm_joints)
