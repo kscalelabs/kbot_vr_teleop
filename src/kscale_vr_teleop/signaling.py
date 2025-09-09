@@ -4,13 +4,15 @@ import websockets
 import socket
 from typing import Dict, Optional
 import logging
-from kscale_vr_teleop.kinematics import handle_hand_tracking
+from kscale_vr_teleop.hand_tracking_handler import HandTrackingHandler
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Hardcoded teleop UDP connection settings
 TELEOP_HOST = "10.33.13.62"
 TELEOP_PORT = 8888
+hand_tracking_handler = HandTrackingHandler(TELEOP_HOST, TELEOP_PORT)
 
 
 class RobotAppPair:
@@ -130,8 +132,8 @@ async def handle_teleop(websocket, robot_id: str):
                 data = json.loads(message)
                 
                 # Process through kinematics if needed
-                handle_hand_tracking(data)
-                
+                hand_tracking_handler.handle_hand_tracking(data)
+
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
                 
             except json.JSONDecodeError:
@@ -177,9 +179,9 @@ async def handler(websocket):
     #     logger.error(f"Error in handler: {e}")
 
 async def main():
-    server = await websockets.serve(handler, "0.0.0.0", 8766, ping_interval=10,   # send a ping every 20s
+    server = await websockets.serve(handler, "0.0.0.0", 8012, ping_interval=10,   # send a ping every 20s
     ping_timeout=300 )
-    logger.info("Robot-App signaling server running on ws://0.0.0.0:8766")
+    logger.info("Robot-App signaling server running on ws://0.0.0.0:8012")
     
     try:
         await server.wait_closed()
