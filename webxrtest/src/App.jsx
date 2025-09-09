@@ -4,7 +4,8 @@ import SideBySideVideo from './SideBySideVideo.tsx';
 import Billboard from './Billboard.tsx';
 
 function App() {
-  const [url, setUrl] = useState("wss://4fe5046c9dd1.ngrok-free.app");
+  const portString = window.location.port ? `:${window.location.port}` : '';
+  const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}`);
   const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", or "billboard"
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
