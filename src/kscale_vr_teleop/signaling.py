@@ -116,12 +116,13 @@ async def handle_app(websocket, robot_id: str):
         if not pair:
             await websocket.send(json.dumps({"type": "error", "error": "Robot is not available"}))
             return
-        if  pair.app_ws != None:
-            logger.info(f"Robot {robot_id} connected to different client")
-            await websocket.send(json.dumps({"type": "error", "error": "Robot connected to different app"}))
-            return
+        # if  pair.app_ws != None:
+        #     pair.app_ws = None
+            # logger.info(f"Robot {robot_id} connected to different client")
+            # await websocket.send(json.dumps({"type": "error", "error": "Robot connected to different app"}))
 
         pair.app_ws = websocket
+        logger.info(f"App connected to robot {robot_id}")
         await websocket.send(json.dumps({"type": "robot_available"}))
     
     # Wait for password attempt from app
