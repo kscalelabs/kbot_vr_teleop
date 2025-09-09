@@ -11,4 +11,5 @@ urdf_parser_py
 tqdm
 trimesh
 urdfdom_py
+websockets
 vuer[all]
