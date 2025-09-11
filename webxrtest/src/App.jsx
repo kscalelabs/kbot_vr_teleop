@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import VideoScreenWeb from './Video.tsx';
 import SideBySideVideo from './SideBySideVideo.tsx';
 import Billboard from './Billboard.tsx';
-
+import Sphere from './Sphere.tsx';
+import Sphere2 from './Sphere2.tsx';
 function App() {
   const portString = window.location.port ? `:${window.location.port}` : '';
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
-  const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", or "billboard"
+  const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", "billboard", or "sphere"
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
@@ -92,6 +93,8 @@ function App() {
             <option value="browser">Browser View</option>
             {/* <option value="vr">VR View</option> */}
             <option value="billboard">Billboard</option>
+            <option value="sphere">Sphere View</option>
+            
           </select>
         </div>
 
@@ -174,7 +177,7 @@ function App() {
 
         {isConnected && (
           <div style={{ padding: '10px', backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '4px', color: '#155724' }}>
-            Connected in {viewMode === 'vr' ? 'VR' : viewMode === 'billboard' ? 'Billboard' : 'Browser'} mode
+            Connected in {viewMode === 'vr' ? 'VR' : viewMode === 'billboard' ? 'Billboard' : viewMode === 'sphere' ? 'Sphere' : 'Browser'} mode
           </div>
         )}
       </div>
@@ -204,6 +207,12 @@ function App() {
           ) : viewMode === 'billboard' ? (
             <Billboard 
               stream={streams[0] || null}
+              url={url}
+            />
+          ) : viewMode === 'sphere' ? (
+            <Sphere2
+              stream1={streams[0] || null}
+              stream2={streams[1] || null}
               url={url}
             />
           ) : (

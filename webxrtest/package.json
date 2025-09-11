@@ -17,7 +17,7 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "PORT=8012 react-scripts start",
+    "start": "cross-env PORT=8012 react-scripts start",
     "build": "react-scripts build",
     "start-https": "set HTTPS=true && set SSL_CRT_FILE=cert.crt && set SSL_KEY_FILE=cert.key && react-scripts start -- --host 0.0.0.0"
   },
@@ -38,5 +38,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "cross-env": "^10.0.0"
   }
 }
