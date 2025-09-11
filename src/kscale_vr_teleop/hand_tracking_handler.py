@@ -26,7 +26,7 @@ if VISUALIZE:
     logs_folder.mkdir(parents=True, exist_ok=True)
     logs_path = logs_folder / f'{time.strftime("%H-%M-%S")}.rrd'
 
-    rr.init("vr_teleop")
+    rr.init("vr_teleop_hand")
 
     print("Saving logs to", logs_path)
     rr.save(logs_path)
@@ -34,6 +34,11 @@ if VISUALIZE:
     
     # Set up coordinate system
     rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
+    
+    # Set up timeseries plot for gripper positions with proper entity path hierarchy
+    rr.log("plots/gripper_positions", rr.SeriesLine(color=[255, 0, 0], name="Right Gripper"), static=True)
+    rr.log("plots/gripper_positions", rr.SeriesLine(color=[0, 0, 255], name="Left Gripper"), static=True)
+    
     print("Rerun kinematics visualization initialized")
 else:
     urdf_logger = None

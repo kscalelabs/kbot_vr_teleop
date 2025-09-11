@@ -80,6 +80,10 @@ class TeleopCore:
         left_finger_spacing = np.linalg.norm(self.left_finger_poses[8,:3,3] - self.left_finger_poses[3,:3,3])
         left_gripper_joint = 0.068*np.clip(left_finger_spacing/0.15, 0, 1)
 
+        # Log gripper positions as scalars for timeseries visualization
+        rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
+        rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
+
         return right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint]
     
     def send_kinfer_commands(self, right_arm: list, left_arm: list):
