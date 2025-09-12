@@ -136,7 +136,6 @@ async def handle_teleop(websocket, robot_id: str):
             try:
                 # Parse the incoming message
                 data = json.loads(message)
-                
                 # Process through appropriate tracking handler
                 if isinstance(tracking_handler, HandTrackingHandler):
                     tracking_handler.handle_hand_tracking(data)

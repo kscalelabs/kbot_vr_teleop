@@ -36,8 +36,8 @@ if VISUALIZE:
     rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
     
     # Set up timeseries plot for gripper positions with proper entity path hierarchy
-    rr.log("plots/gripper_positions", rr.SeriesLine(color=[255, 0, 0], name="Right Gripper"), static=True)
-    rr.log("plots/gripper_positions", rr.SeriesLine(color=[0, 0, 255], name="Left Gripper"), static=True)
+    rr.log("plots/gripper_positions", rr.SeriesLines(colors=[255, 0, 0], names="Right Gripper"), static=True)
+    rr.log("plots/gripper_positions", rr.SeriesLines(colors=[0, 0, 255], names="Left Gripper"), static=True)
     
     print("Rerun kinematics visualization initialized")
 else:

@@ -101,12 +101,13 @@ class ControllerTeleopCore:
         
         # Convert controller trigger/grip values to gripper joint positions
         # 0.068 appears to be the maximum gripper opening
+
         right_gripper_joint = 0.068 * (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
         left_gripper_joint = 0.068 * (1.0 - self.left_gripper_value)
 
         # Log gripper positions as scalars for timeseries visualization
-        rr.log("plots/gripper_positions/Right Gripper", rr.Scalar(right_gripper_joint))
-        rr.log("plots/gripper_positions/Left Gripper", rr.Scalar(left_gripper_joint))
+        rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
+        rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
 
         return right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint]
     

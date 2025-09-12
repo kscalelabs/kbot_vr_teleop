@@ -33,8 +33,8 @@ if VISUALIZE:
     rr.log('origin_axes', rr.Transform3D(translation=[0,0,0], axis_length=0.1), static=True)
     
     # Set up timeseries plot for gripper positions with proper entity path hierarchy
-    rr.log("plots/gripper_positions", rr.SeriesLine(color=[255, 0, 0], name="Right Gripper"), static=True)
-    rr.log("plots/gripper_positions", rr.SeriesLine(color=[0, 0, 255], name="Left Gripper"), static=True)
+    rr.log("plots/gripper_positions", rr.SeriesLines(colors=[255, 0, 0], names="Right Gripper"), static=True)
+    rr.log("plots/gripper_positions", rr.SeriesLines(colors=[0, 0, 255], names="Left Gripper"), static=True)
     
     print("Rerun kinematics visualization initialized")
 else:
@@ -94,7 +94,6 @@ class ControllerTrackingHandler:
             
             # Get gripper value from trigger (prefer trigger over grip for now)
             gripper_value = left_controller.get('trigger', 0.0)
-            
             # Update controller state
             self.teleop_core.update_left_controller(left_controller_pose, gripper_value)
 
@@ -105,7 +104,8 @@ class ControllerTrackingHandler:
             # Extract position and orientation
             position = np.array(right_controller['position'], dtype=np.float32)
             orientation = np.array(right_controller['orientation'], dtype=np.float32)  # [qx, qy, qz, qw]
-            
+            if (len(orientation) == 0 or len(position) == 0 ):
+                return
             # Convert quaternion to rotation matrix
             qx, qy, qz, qw = orientation
             rotation_matrix = self.quaternion_to_rotation_matrix(qx, qy, qz, qw)

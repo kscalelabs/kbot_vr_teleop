@@ -3,7 +3,7 @@ import VideoScreenWeb from './Video.tsx';
 import SideBySideVideo from './SideBySideVideo.tsx';
 import Billboard from './Billboard.tsx';
 import Sphere from './Sphere.tsx';
-import Sphere2 from './Sphere2.tsx';
+
 function App() {
   const portString = window.location.port ? `:${window.location.port}` : '';
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
@@ -11,7 +11,8 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
-
+  const [hands, setHands] = useState(true);
+  
   const handleConnect = () => {
     setIsConnected(true);
   };
@@ -40,7 +41,9 @@ function App() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      minHeight: '100vh'
+      minHeight: '100vh',
+      backgroundColor: '#000000',
+      color: '#ffffff'
     }}>
       <div style={{ 
         marginBottom: '20px', 
@@ -50,10 +53,61 @@ function App() {
         maxWidth: '400px',
         width: '100%'
       }}>
-        <h2>VR Stream Controller</h2>
+        <h1 style={{ 
+          textAlign: 'center', 
+          color: '#ffffff', 
+          marginBottom: '20px',
+          fontSize: '28px',
+          fontWeight: 'bold'
+        }}>
+          K-Scale Teleoperate
+        </h1>
+
+        {/* Tracking Mode Toggle */}
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <label style={{ display: 'block', marginBottom: '10px', color: '#ffffff', fontSize: '16px' }}>
+            Tracking Mode:
+          </label>
+          <div style={{ display: 'flex', gap: '0px', border: '2px solid #333', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              onClick={() => setHands(false)}
+              disabled={isConnected}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                backgroundColor: !hands ? '#007bff' : '#333333',
+                color: !hands ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: isConnected ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: !hands ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Controller
+            </button>
+            <button
+              onClick={() => setHands(true)}
+              disabled={isConnected}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                backgroundColor: hands ? '#007bff' : '#333333',
+                color: hands ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: isConnected ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: hands ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Hands
+            </button>
+          </div>
+        </div>
         
-        <div>
-          <label htmlFor="url-input" style={{ display: 'block', marginBottom: '5px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <label htmlFor="url-input" style={{ display: 'block', marginBottom: '5px', color: '#ffffff' }}>
             WebSocket URL:
           </label>
           <input
@@ -65,44 +119,80 @@ function App() {
             style={{
               width: '100%',
               padding: '8px',
-              border: '1px solid #ccc',
+              border: '1px solid #555',
               borderRadius: '4px',
-              fontSize: '14px'
+              fontSize: '14px',
+              backgroundColor: '#222222',
+              color: '#ffffff'
             }}
             placeholder="Enter WebSocket URL"
           />
         </div>
 
-        <div>
-          <label htmlFor="view-mode" style={{ display: 'block', marginBottom: '5px' }}>
+        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <label style={{ display: 'block', marginBottom: '10px', color: '#ffffff', fontSize: '16px' }}>
             View Mode:
           </label>
-          <select
-            id="view-mode"
-            value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
-            disabled={isConnected}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: '14px'
-            }}
-          >
-            <option value="browser">Browser View</option>
-            {/* <option value="vr">VR View</option> */}
-            <option value="billboard">Billboard</option>
-            <option value="sphere">Sphere View</option>
-            
-          </select>
+          <div style={{ display: 'flex', gap: '0px', border: '2px solid #333', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              onClick={() => setViewMode('browser')}
+              disabled={isConnected}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: viewMode === 'browser' ? '#007bff' : '#333333',
+                color: viewMode === 'browser' ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: isConnected ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'browser' ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Browser
+            </button>
+            <button
+              onClick={() => setViewMode('billboard')}
+              disabled={isConnected}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: viewMode === 'billboard' ? '#007bff' : '#333333',
+                color: viewMode === 'billboard' ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: isConnected ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'billboard' ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Billboard
+            </button>
+            <button
+              onClick={() => setViewMode('sphere')}
+              disabled={isConnected}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: viewMode === 'sphere' ? '#007bff' : '#333333',
+                color: viewMode === 'sphere' ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: isConnected ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'sphere' ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Sphere
+            </button>
+          </div>
         </div>
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <label style={{ display: 'block', marginBottom: '5px', color: '#ffffff' }}>
             Active Cameras:
           </label>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', justifyContent: 'center' }}>
             <button
               onClick={() => toggleCamera(0)}
               style={{
@@ -134,14 +224,14 @@ function App() {
           </div>
           <div style={{ 
             fontSize: '12px', 
-            color: '#666', 
+            color: '#cccccc', 
             marginBottom: '10px' 
           }}>
             Active: [{activeCameras.join(', ')}]
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
           <button
             onClick={handleConnect}
             disabled={isConnected}
@@ -176,7 +266,7 @@ function App() {
         </div>
 
         {isConnected && (
-          <div style={{ padding: '10px', backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '4px', color: '#155724' }}>
+          <div style={{ padding: '10px', backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '4px', color: '#155724', textAlign: 'center' }}>
             Connected in {viewMode === 'vr' ? 'VR' : viewMode === 'billboard' ? 'Billboard' : viewMode === 'sphere' ? 'Sphere' : 'Browser'} mode
           </div>
         )}
@@ -197,20 +287,15 @@ function App() {
           />
 
           {/* Conditionally mount the view component based on selected mode */}
-          {viewMode === 'vr' ? (
-            <></>
-            // <StereoVR 
-            //   streamLeft={streams[0] || null} 
-            //   streamRight={streams[1] || null} 
-            //   url={url}
-            // />
-          ) : viewMode === 'billboard' ? (
-            <Billboard 
-              stream={streams[0] || null}
-              url={url}
-            />
+          { viewMode === 'billboard' ? (
+       
+              <Billboard 
+                stream={streams[0] || null}
+                url={url}
+                hands={hands}
+              />
           ) : viewMode === 'sphere' ? (
-            <Sphere2
+            <Sphere
               stream1={streams[0] || null}
               stream2={streams[1] || null}
               url={url}
