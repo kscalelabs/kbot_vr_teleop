@@ -173,7 +173,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     // ================
     // SPHERE MESH
     // ================
-    const segments = 256;
+    const segments = 1024;
     const sphereRadius = 1.0;
     const positions: number[] = [];
     const indices: number[] = [];
