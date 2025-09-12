@@ -35,13 +35,15 @@ async def glib_main_loop_iteration():
         await asyncio.sleep(0.01)
 
 class WebRTCClient:
-    def __init__(self, loop, flip_video=False):
+    def __init__(self, loop, flip_video=False, left_mp4=None, right_mp4=None):
         self.pipe = None
         self.webrtc = None
         self.ws = None  # WebSocket connection
         self.loop = loop
         self.added_data_channel = False
         self.flip_video = flip_video
+        self.left_mp4 = left_mp4
+        self.right_mp4 = right_mp4
 
     def start_pipeline(self, active_cameras):
         print("Starting pipeline")
@@ -56,58 +58,101 @@ class WebRTCClient:
         self.webrtc.set_property("latency", 200)
         self.webrtc.connect("on-ice-candidate", self.send_ice_candidate_message)
 
-        video_sources = []
-        for i in range(len(active_cameras)):
-            video_sources.append(VIDEO_SOURCES[active_cameras[i]])
-        for i, cam_name in enumerate(video_sources):
-            src = Gst.ElementFactory.make("libcamerasrc", f"libcamerasrc{i}")
-            src.set_property("camera-name", cam_name)
-            print("camera-name", src.get_property("camera-name"))
-            caps = Gst.Caps.from_string("video/x-raw,format=YUY2, framerate=30/1")
-            capsfilter = Gst.ElementFactory.make("capsfilter", f"caps{i}")
-            capsfilter.set_property("caps", caps)
-            conv = Gst.ElementFactory.make("videoconvert", f"conv{i}")
-            
-            # Add videoflip element only if flip is enabled
-            if self.flip_video:
-                flip = Gst.ElementFactory.make("videoflip", f"flip{i}")
-                flip.set_property("method", 5)  # 2 = vertical flip
-                self.pipe.add(flip)
-            
-            queue = Gst.ElementFactory.make("queue", f"queue{i}")
-            queue.set_property("leaky", 1)
-            queue.set_property("max-size-buffers", 1)
-            vp8enc = Gst.ElementFactory.make("vp8enc", f"vp8enc{i}")
-            vp8enc.set_property("deadline", 1)
-            pay = Gst.ElementFactory.make("rtpvp8pay", f"pay{i}")
-            pay.set_property("pt", 96+i)  # unique payload per track
-            self.pipe.add(src)
-            self.pipe.add(capsfilter)
-            self.pipe.add(conv)
-            self.pipe.add(queue)
-            self.pipe.add(vp8enc)
-            self.pipe.add(pay)
-            src.link(capsfilter)
-            capsfilter.link(conv)
-            
-            # Link through flip element if enabled, otherwise directly to queue
-            if self.flip_video:
-                conv.link(flip)
-                flip.link(queue)
-            else:
-                conv.link(queue)
-            queue.link(vp8enc)
-            vp8enc.link(pay)
-            
-            # Add transceiver - this will create the necessary pads in webrtcbin
-            src_pad = src.get_static_pad("src")
-            sink_pad = webrtc.get_request_pad(f"sink_{i}")
-            if not sink_pad:
-                print(f"Failed to get sink pad for stream {i}")
-            else:
+        # Determine sources: MP4 files or cameras
+        sources = []
+        if self.left_mp4 or self.right_mp4:
+            # Use MP4 files if provided
+            if self.left_mp4:
+                sources.append({'type': 'mp4', 'path': self.left_mp4})
+            if self.right_mp4:
+                sources.append({'type': 'mp4', 'path': self.right_mp4})
+        else:
+            # Use camera sources
+            for i in range(len(active_cameras)):
+                sources.append({'type': 'camera', 'path': VIDEO_SOURCES[active_cameras[i]]})
+
+        for i, src_info in enumerate(sources):
+            if src_info['type'] == 'mp4':
+                src = Gst.ElementFactory.make("filesrc", f"filesrc{i}")
+                src.set_property("location", src_info['path'])
+                demux = Gst.ElementFactory.make("qtdemux", f"demux{i}")
+                decode = Gst.ElementFactory.make("decodebin", f"decode{i}")
+                conv = Gst.ElementFactory.make("videoconvert", f"conv{i}")
+                caps = Gst.Caps.from_string("video/x-raw,format=I420, framerate=30/1")
+                capsfilter = Gst.ElementFactory.make("capsfilter", f"caps{i}")
+                capsfilter.set_property("caps", caps)
+                queue = Gst.ElementFactory.make("queue", f"queue{i}")
+                queue.set_property("leaky", 1)
+                queue.set_property("max-size-buffers", 1)
+                vp8enc = Gst.ElementFactory.make("vp8enc", f"vp8enc{i}")
+                vp8enc.set_property("deadline", 1)
+                pay = Gst.ElementFactory.make("rtpvp8pay", f"pay{i}")
+                pay.set_property("pt", 96+i)
+                self.pipe.add(src)
+                self.pipe.add(demux)
+                self.pipe.add(decode)
+                self.pipe.add(conv)
+                self.pipe.add(capsfilter)
+                self.pipe.add(queue)
+                self.pipe.add(vp8enc)
+                self.pipe.add(pay)
+                src.link(demux)
+                demux.connect("pad-added", lambda demux, pad: pad.link(decode.get_static_pad("sink")))
+                decode.connect("pad-added", lambda decode, pad: pad.link(conv.get_static_pad("sink")))
+                conv.link(capsfilter)
+                capsfilter.link(queue)
+                queue.link(vp8enc)
+                vp8enc.link(pay)
+                # Add transceiver
                 src_pad = pay.get_static_pad("src")
-                ret = src_pad.link(sink_pad)
-                print("Pad link result", ret)
+                sink_pad = webrtc.get_request_pad(f"sink_{i}")
+                if not sink_pad:
+                    print(f"Failed to get sink pad for stream {i}")
+                else:
+                    ret = src_pad.link(sink_pad)
+                    print("Pad link result", ret)
+            else:
+                # Camera source (original logic)
+                src = Gst.ElementFactory.make("libcamerasrc", f"libcamerasrc{i}")
+                src.set_property("camera-name", src_info['path'])
+                print("camera-name", src.get_property("camera-name"))
+                caps = Gst.Caps.from_string("video/x-raw,format=YUY2, framerate=30/1")
+                capsfilter = Gst.ElementFactory.make("capsfilter", f"caps{i}")
+                capsfilter.set_property("caps", caps)
+                conv = Gst.ElementFactory.make("videoconvert", f"conv{i}")
+                if self.flip_video:
+                    flip = Gst.ElementFactory.make("videoflip", f"flip{i}")
+                    flip.set_property("method", 5)
+                    self.pipe.add(flip)
+                queue = Gst.ElementFactory.make("queue", f"queue{i}")
+                queue.set_property("leaky", 1)
+                queue.set_property("max-size-buffers", 1)
+                vp8enc = Gst.ElementFactory.make("vp8enc", f"vp8enc{i}")
+                vp8enc.set_property("deadline", 1)
+                pay = Gst.ElementFactory.make("rtpvp8pay", f"pay{i}")
+                pay.set_property("pt", 96+i)
+                self.pipe.add(src)
+                self.pipe.add(capsfilter)
+                self.pipe.add(conv)
+                self.pipe.add(queue)
+                self.pipe.add(vp8enc)
+                self.pipe.add(pay)
+                src.link(capsfilter)
+                capsfilter.link(conv)
+                if self.flip_video:
+                    conv.link(flip)
+                    flip.link(queue)
+                else:
+                    conv.link(queue)
+                queue.link(vp8enc)
+                vp8enc.link(pay)
+                src_pad = pay.get_static_pad("src")
+                sink_pad = webrtc.get_request_pad(f"sink_{i}")
+                if not sink_pad:
+                    print(f"Failed to get sink pad for stream {i}")
+                else:
+                    ret = src_pad.link(sink_pad)
+                    print("Pad link result", ret)
 
         self.webrtc.connect("on-negotiation-needed", self.on_negotiation_needed)
         self.pipe.set_state(Gst.State.PLAYING)
@@ -206,16 +251,17 @@ class WebRTCClient:
 async def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='WebRTC Video Streaming Client')
-    parser.add_argument('--flip', action='store_true', 
-                       help='Vertically flip the video stream')
+    parser.add_argument('--flip', action='store_true', help='Vertically flip the video stream')
+    parser.add_argument('--left-mp4', type=str, default=None, help='Path to left eye MP4 file')
+    parser.add_argument('--right-mp4', type=str, default=None, help='Path to right eye MP4 file')
     args = parser.parse_args()
-    
+
     loop = asyncio.get_running_loop()
-    client = WebRTCClient(loop, flip_video=args.flip)
-    
+    client = WebRTCClient(loop, flip_video=args.flip, left_mp4=args.left_mp4, right_mp4=args.right_mp4)
+
     # Start the GLib main loop iteration task
     asyncio.create_task(glib_main_loop_iteration())
-    
+
     # Connect to the WebSocket server
     await client.connect_websocket()
 
