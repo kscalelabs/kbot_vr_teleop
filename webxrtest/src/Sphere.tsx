@@ -333,8 +333,8 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
         </button>
       )}
       <div>{status}</div>
-      <video ref={videoRef1} style={{ display: "none" }} muted playsInline />
-      <video ref={videoRef2} style={{ display: "none" }} muted playsInline />
+      <video ref={videoRef1} src={url} style={{ display: "none" }} muted playsInline />
+      <video ref={videoRef2} src={url} style={{ display: "none" }} muted playsInline />
       <canvas ref={canvasRef} style={{ width: "100%", height: "400px" }} />
     </div>
   );

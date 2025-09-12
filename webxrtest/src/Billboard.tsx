@@ -460,6 +460,7 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
       
       <video
         ref={videoRef}
+        src="/pi_L_web.mp4"
         crossOrigin="anonymous"
         style={{ display: 'none' }}
         muted
