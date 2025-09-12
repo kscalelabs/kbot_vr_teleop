@@ -58,40 +58,38 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     video.preload = 'metadata';
 
     updateStatus('Loading video...');
-    
-    const waitForVideo = (video: HTMLVideoElement): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        if (video.readyState >= 2) {
-          resolve();
-          return;
-        }
-        
-        const onLoadedData = () => {
-          video.removeEventListener('loadeddata', onLoadedData);
-          video.removeEventListener('error', onError);
-          resolve();
-        };
-        
-        const onError = () => {
-          video.removeEventListener('loadeddata', onLoadedData);
-          video.removeEventListener('error', onError);
-          reject(new Error(`Video failed to load`));
-        };
-        
-        video.addEventListener('loadeddata', onLoadedData);
-        video.addEventListener('error', onError);
-        video.load();
-      });
-    };
 
-    try {
-      await waitForVideo(video);
-      updateStatus('Video loaded, starting playback...');
-      await video.play();
-      updateStatus('Video playing');
-    } catch (err) {
-      updateStatus(`Video error: ${err}`);
-      return;
+    let videoReady = false;
+    if (stream) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          if (video.readyState >= 2) {
+            resolve();
+            return;
+          }
+          const onLoadedData = () => {
+            video.removeEventListener('loadeddata', onLoadedData);
+            video.removeEventListener('error', onError);
+            resolve();
+          };
+          const onError = () => {
+            video.removeEventListener('loadeddata', onLoadedData);
+            video.removeEventListener('error', onError);
+            reject(new Error(`Video failed to load`));
+          };
+          video.addEventListener('loadeddata', onLoadedData);
+          video.addEventListener('error', onError);
+          video.load();
+        });
+        await video.play();
+        videoReady = true;
+        updateStatus('Video playing');
+      } catch (err) {
+        updateStatus(`Video error: ${err}`);
+        // Continue to launch VR even if video fails
+      }
+    } else {
+      updateStatus('No stream provided, continuing to launch VR.');
     }
 
     // Shaders for curved billboard
