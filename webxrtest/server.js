@@ -8,8 +8,8 @@ const app = express();
 
 // SSL certificate options
 const options = {
-  key: fs.readFileSync(path.resolve(__dirname, '../https-proxy/cert-key.pem')),
-  cert: fs.readFileSync(path.resolve(__dirname, '../https-proxy/cert.pem'))
+  key: fs.readFileSync(path.resolve(__dirname, './cert-key.pem')),
+  cert: fs.readFileSync(path.resolve(__dirname, './cert.pem'))
 };
 
 // Proxy for service on 8013 (mounted at /service2)
