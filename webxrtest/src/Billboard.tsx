@@ -1,8 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { handleHandTracking, handleControllerTracking } from './webxrTracking';
-import * as THREE from 'three';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
-import { renderSTLGeometry, renderTestRing } from './stlGlRenderer';
 
 interface BillboardProps {
   stream: MediaStream | null;
@@ -13,15 +10,10 @@ interface BillboardProps {
 export default function Billboard({ stream, url, hands }: BillboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const lastHandSendRef = useRef(0);
+  const lastHandSendRef = useRef<number>(0);
   const [started, setStarted] = useState(false);
   const [status, setStatus] = useState('');
-  const [stlReady, setStlReady] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const stlGeometriesRef = useRef<{left: THREE.BufferGeometry|null, right: THREE.BufferGeometry|null}>({left: null, right: null});
-  const threeSceneRef = useRef<THREE.Scene|null>(null);
-  const threeRendererRef = useRef<THREE.WebGLRenderer|null>(null);
-  const stlLoadedRef = useRef(false);
   
   useEffect(() => {
     // Use the first available stream for the billboard
@@ -66,39 +58,36 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     video.preload = 'metadata';
 
     updateStatus('Loading video...');
-
-    let videoReady = false;
-    if (stream) {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          if (video.readyState >= 2) {
-            resolve();
-            return;
-          }
-          const onLoadedData = () => {
-            video.removeEventListener('loadeddata', onLoadedData);
-            video.removeEventListener('error', onError);
-            resolve();
-          };
-          const onError = () => {
-            video.removeEventListener('loadeddata', onLoadedData);
-            video.removeEventListener('error', onError);
-            reject(new Error(`Video failed to load`));
-          };
-          video.addEventListener('loadeddata', onLoadedData);
-          video.addEventListener('error', onError);
-          video.load();
-        });
-        await video.play();
-        videoReady = true;
-        updateStatus('Video playing');
-      } catch (err) {
-        updateStatus(`Video error: ${err}`);
-        // Continue to launch VR even if video fails
-      }
-    } else {
-      updateStatus('No stream provided, continuing to launch VR.');
-    }
+    
+    const waitForVideo = (video: HTMLVideoElement): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (video.readyState >= 2) {
+          resolve();
+          return;
+        }
+        
+        const onLoadedData = () => {
+          video.removeEventListener('loadeddata', onLoadedData);
+          video.removeEventListener('error', onError);
+          resolve();
+        };
+        
+        const onError = () => {
+          video.removeEventListener('loadeddata', onLoadedData);
+          video.removeEventListener('error', onError);
+          reject(new Error(`Video failed to load`));
+        };
+        
+        video.addEventListener('loadeddata', onLoadedData);
+        video.addEventListener('error', onError);
+        video.load();
+      });
+    };
+    waitForVideo(video).then(() => {
+      updateStatus('Video loaded, starting playback...');
+      video.play().catch(e => console.log(`Video play warning: ${e.message}`));
+    });
+  
 
     // Shaders for curved billboard
     const vertexShaderSource = `
@@ -145,7 +134,7 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       const error = gl.getProgramInfoLog(program);
-      updateStatus(`Programlink error: ${error}`);
+      updateStatus(`Program link error: ${error}`);
     }
     gl.useProgram(program);
 
@@ -304,9 +293,9 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
         return;
       }
 
-      // Handle hand/controller tracking (shared)
+      // Handle hand tracking
       if (hands) {
-        handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
+      handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
       } else {
         handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef);
       }
@@ -354,17 +343,6 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
 
         // Draw the curved billboard
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
-        // Render STL meshes using raw WebGL only if loaded
-        if (stlReady && stlGeometriesRef.current.left) {
-          const leftTransform = new THREE.Matrix4().makeTranslation(0, 1.5, -2);
-          renderSTLGeometry(gl, stlGeometriesRef.current.left, leftTransform);
-        }
-        if (stlReady && stlGeometriesRef.current.right) {
-          const rightTransform = new THREE.Matrix4().makeTranslation(0.5, 1.5, -2);
-          renderSTLGeometry(gl, stlGeometriesRef.current.right, rightTransform);
-        }
-        // Render a ring of red triangles for test
-        renderTestRing(gl);
       });
 
       session.requestAnimationFrame(onXRFrame);
@@ -405,20 +383,6 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
       }
     });
   };
-
-  // Load STL files only once
-  if (!stlLoadedRef.current) {
-    const loader = new STLLoader();
-    loader.load('/PRT0001.stl', geometry => {
-      stlGeometriesRef.current.left = geometry;
-      if (stlGeometriesRef.current.right) setStlReady(true);
-    });
-    loader.load('/PRT0001_2.stl', geometry => {
-      stlGeometriesRef.current.right = geometry;
-      if (stlGeometriesRef.current.left) setStlReady(true);
-    });
-    stlLoadedRef.current = true;
-  }
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>

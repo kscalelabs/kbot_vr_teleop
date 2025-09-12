@@ -4,10 +4,14 @@
 export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef) {
   const now = performance.now();
   const sendInterval = 1000 / 30; // 30 Hz
-  if (now - lastHandSendRef.current < sendInterval) return;
-  lastHandSendRef.current = now;
-  if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+  const shouldSend = now - lastHandSendRef.current >= sendInterval;
+  
+  if (shouldSend) {
+    lastHandSendRef.current = now;
+  }
+  
   const handData = {};
+  const handPositions = { left: null, right: null };
   const JOINT_ORDER = [
     "wrist", "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
     "index-finger-metacarpal", "index-finger-phalanx-proximal", "index-finger-phalanx-intermediate", 
@@ -23,6 +27,19 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
       const handedness = inputSource.handedness;
       const hand = inputSource.hand;
       const continuousArray = [];
+      
+      // Extract wrist position for STL rendering
+      const wristJoint = hand.get('wrist');
+      if (wristJoint && frame.getJointPose) {
+        const wristPose = frame.getJointPose(wristJoint, referenceSpace);
+        if (wristPose) {
+          handPositions[handedness] = {
+            position: wristPose.transform.position,
+            orientation: wristPose.transform.orientation
+          };
+        }
+      }
+      
       for (let i = 0; i < JOINT_ORDER.length; i++) {
         const jointName = JOINT_ORDER[i];
         const joint = hand.get(jointName);
@@ -40,13 +57,17 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
       handData[handedness] = continuousArray;
     }
   }
-  if (Object.keys(handData).length > 0) {
+  // Send WebSocket data only at specified interval
+  if (shouldSend && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(handData).length > 0) {
     try {
       wsRef.current.send(JSON.stringify(handData));
     } catch (error) {
       console.log(`Failed to send hand tracking data: ${error}`);
     }
   }
+  
+  // Always return hand positions for local rendering
+  return handPositions;
 }
 
 export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandSendRef) {
