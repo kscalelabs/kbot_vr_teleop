@@ -3,9 +3,10 @@ import React, { useRef, useState, useEffect } from 'react';
 interface BillboardProps {
   stream: MediaStream | null;
   url: string;
+  hands: boolean;
 }
 
-export default function Billboard({ stream, url }: BillboardProps) {
+export default function Billboard({ stream, url, hands }: BillboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastHandSendRef = useRef<number>(0);
@@ -297,7 +298,11 @@ export default function Billboard({ stream, url }: BillboardProps) {
       }
 
       // Handle hand tracking
+      if (hands) {
       handleHandTracking(frame, refSpace);
+      } else {
+        handleControllerTracking(frame, refSpace);
+      }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer!.framebuffer);
       gl.clearColor(0.0, 0.0, 0.0, 1);
@@ -440,6 +445,79 @@ export default function Billboard({ stream, url }: BillboardProps) {
         wsRef.current!.send(JSON.stringify(handData));
       } catch (error) {
         console.log(`Failed to send hand tracking data: ${error}`);
+      }
+    }
+  };
+
+  const handleControllerTracking = (frame: XRFrame, referenceSpace: XRReferenceSpace) => {
+    const now = performance.now();
+    const sendInterval = 1000 / 30; // 30 Hz
+    if (now - lastHandSendRef.current < sendInterval) {
+      return;
+    }
+    lastHandSendRef.current = now;
+    
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+  
+    const controllerData: any = {};
+  
+    for (const inputSource of (frame as any).session.inputSources) {
+      // Check if this is a controller (not a hand)
+      if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
+        const handedness = inputSource.handedness; // 'left' or 'right'
+        
+        // Get controller pose
+        const controllerPose = (frame as any).getPose(inputSource.gripSpace, referenceSpace);
+        
+        if (controllerPose) {
+          // Extract position and orientation from XRRigidTransform
+          const position = [
+            controllerPose.transform.position.x,
+            controllerPose.transform.position.y,
+            controllerPose.transform.position.z
+          ];
+          const orientation = [
+            controllerPose.transform.orientation.x,
+            controllerPose.transform.orientation.y,
+            controllerPose.transform.orientation.z,
+            controllerPose.transform.orientation.w
+          ];
+          
+          // Get gamepad data for buttons and triggers
+          const gamepad = inputSource.gamepad;
+          let trigger = 0.0;
+          let grip = 0.0;
+          let buttons: boolean[] = [];
+          
+          if (gamepad) {
+            // Standard WebXR controller mapping:
+            // Button 0: Trigger
+            // Button 1: Grip/Squeeze
+            // Button 2: Touchpad/Thumbstick (if present)
+            // Button 3: Menu button (if present)
+            trigger = gamepad.buttons[0]?.value || 0.0;
+            grip = gamepad.buttons[1]?.value || 0.0;
+            buttons = gamepad.buttons.map(button => button.pressed);
+          }
+          
+          controllerData[handedness] = {
+            position: position,
+            orientation: orientation,
+            trigger: trigger,
+            grip: grip,
+            buttons: buttons
+          };
+        }
+      }
+    }
+  
+    if (Object.keys(controllerData).length > 0) {
+      try {
+        wsRef.current!.send(JSON.stringify(controllerData));
+      } catch (error) {
+        console.log(`Failed to send controller tracking data: ${error}`);
       }
     }
   };
