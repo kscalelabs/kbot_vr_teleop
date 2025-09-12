@@ -1,5 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { handleHandTracking, handleControllerTracking } from './webxrTracking';
+import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { renderSTLGeometry, renderTestRing } from './stlGlRenderer';
 
 interface BillboardProps {
   stream: MediaStream | null;
@@ -13,7 +16,12 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
   const lastHandSendRef = useRef(0);
   const [started, setStarted] = useState(false);
   const [status, setStatus] = useState('');
+  const [stlReady, setStlReady] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const stlGeometriesRef = useRef<{left: THREE.BufferGeometry|null, right: THREE.BufferGeometry|null}>({left: null, right: null});
+  const threeSceneRef = useRef<THREE.Scene|null>(null);
+  const threeRendererRef = useRef<THREE.WebGLRenderer|null>(null);
+  const stlLoadedRef = useRef(false);
   
   useEffect(() => {
     // Use the first available stream for the billboard
@@ -137,7 +145,7 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       const error = gl.getProgramInfoLog(program);
-      updateStatus(`Program link error: ${error}`);
+      updateStatus(`Programlink error: ${error}`);
     }
     gl.useProgram(program);
 
@@ -346,6 +354,17 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
 
         // Draw the curved billboard
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
+        // Render STL meshes using raw WebGL only if loaded
+        if (stlReady && stlGeometriesRef.current.left) {
+          const leftTransform = new THREE.Matrix4().makeTranslation(0, 1.5, -2);
+          renderSTLGeometry(gl, stlGeometriesRef.current.left, leftTransform);
+        }
+        if (stlReady && stlGeometriesRef.current.right) {
+          const rightTransform = new THREE.Matrix4().makeTranslation(0.5, 1.5, -2);
+          renderSTLGeometry(gl, stlGeometriesRef.current.right, rightTransform);
+        }
+        // Render a ring of red triangles for test
+        renderTestRing(gl);
       });
 
       session.requestAnimationFrame(onXRFrame);
@@ -387,6 +406,19 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     });
   };
 
+  // Load STL files only once
+  if (!stlLoadedRef.current) {
+    const loader = new STLLoader();
+    loader.load('/PRT0001.stl', geometry => {
+      stlGeometriesRef.current.left = geometry;
+      if (stlGeometriesRef.current.right) setStlReady(true);
+    });
+    loader.load('/PRT0001_2.stl', geometry => {
+      stlGeometriesRef.current.right = geometry;
+      if (stlGeometriesRef.current.left) setStlReady(true);
+    });
+    stlLoadedRef.current = true;
+  }
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
