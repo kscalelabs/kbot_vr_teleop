@@ -9,6 +9,9 @@
     "@testing-library/jest-dom": "^6.7.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "concurrently": "^9.2.1",
+    "express": "^5.1.0",
+    "http-proxy-middleware": "^3.0.5",
     "mkcert": "^3.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -19,7 +22,7 @@
   "scripts": {
     "start": "cross-env PORT=8012 react-scripts start",
     "build": "react-scripts build",
-    "start-https": "set HTTPS=true && set SSL_CRT_FILE=cert.crt && set SSL_KEY_FILE=cert.key && react-scripts start -- --host 0.0.0.0"
+    "start-https": "concurrently \"cross-env PORT=8012 react-scripts start\" \"node server.js\""
   },
   "eslintConfig": {
     "extends": [
