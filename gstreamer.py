@@ -71,7 +71,7 @@ class WebRTCClient:
             # Add videoflip element only if flip is enabled
             if self.flip_video:
                 flip = Gst.ElementFactory.make("videoflip", f"flip{i}")
-                flip.set_property("method", 2)  # 2 = vertical flip
+                flip.set_property("method", 5)  # 2 = vertical flip
                 self.pipe.add(flip)
             
             queue = Gst.ElementFactory.make("queue", f"queue{i}")
