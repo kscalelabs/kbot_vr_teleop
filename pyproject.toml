@@ -8,7 +8,20 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "jax>=0.6.2",
+    "jaxopt>=0.8.5",
+    "line-profiler>=5.0.0",
+    "lxml>=6.0.1",
+    "numpy>=2.2.6",
+    "pillow>=11.3.0",
+    "pyyaml>=6.0.2",
+    "rerun-sdk>=0.24.1",
+    "scipy>=1.15.3",
+    "tqdm>=4.67.1",
+    "trimesh>=4.8.1",
+    "websockets>=15.0.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
