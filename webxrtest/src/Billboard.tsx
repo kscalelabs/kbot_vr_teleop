@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { handleHandTracking, handleControllerTracking } from './webxrTracking';
 
 interface BillboardProps {
   stream: MediaStream | null;
@@ -9,7 +10,7 @@ interface BillboardProps {
 export default function Billboard({ stream, url, hands }: BillboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const lastHandSendRef = useRef<number>(0);
+  const lastHandSendRef = useRef(0);
   const [started, setStarted] = useState(false);
   const [status, setStatus] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
@@ -297,11 +298,11 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
         return;
       }
 
-      // Handle hand tracking
+      // Handle hand/controller tracking (shared)
       if (hands) {
-      handleHandTracking(frame, refSpace);
+        handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
       } else {
-        handleControllerTracking(frame, refSpace);
+        handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef);
       }
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer!.framebuffer);
@@ -388,139 +389,6 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     });
   };
 
-  const handleHandTracking = (frame: XRFrame, referenceSpace: XRReferenceSpace) => {
-    const now = performance.now();
-    const sendInterval = 1000 / 30; // 30 Hz
-  
-    if (now - lastHandSendRef.current < sendInterval) {
-      return;
-    }
-    lastHandSendRef.current = now;
-    
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-
-    const handData: any = {};
-
-    const JOINT_ORDER = [
-      "wrist", "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
-      "index-finger-metacarpal", "index-finger-phalanx-proximal", "index-finger-phalanx-intermediate", 
-      "index-finger-phalanx-distal", "index-finger-tip", "middle-finger-metacarpal", 
-      "middle-finger-phalanx-proximal", "middle-finger-phalanx-intermediate", "middle-finger-phalanx-distal",
-      "middle-finger-tip", "ring-finger-metacarpal", "ring-finger-phalanx-proximal", 
-      "ring-finger-phalanx-intermediate", "ring-finger-phalanx-distal", "ring-finger-tip",
-      "pinky-finger-metacarpal", "pinky-finger-phalanx-proximal", "pinky-finger-phalanx-intermediate",
-      "pinky-finger-phalanx-distal", "pinky-finger-tip"
-    ];
-
-    for (const inputSource of frame.session.inputSources) {
-      if (inputSource.hand) {
-        const handedness = inputSource.handedness;
-        const hand = inputSource.hand;
-        const continuousArray: number[] = [];
-        
-        for (let i = 0; i < JOINT_ORDER.length; i++) {
-          const jointName = JOINT_ORDER[i];
-          const joint = hand.get(jointName as XRHandJoint);
-          
-          if (joint && frame.getJointPose) {
-            const jointPose = frame.getJointPose(joint, referenceSpace);
-            if (jointPose) {
-              continuousArray.push(...Array.from(jointPose.transform.matrix) as number[]);
-            } else {
-              continuousArray.push(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-            }
-          } else {
-            continuousArray.push(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-          }
-        }
-        
-        handData[handedness] = continuousArray;
-      }
-    }
-
-    if (Object.keys(handData).length > 0) {
-      try {
-        wsRef.current!.send(JSON.stringify(handData));
-      } catch (error) {
-        console.log(`Failed to send hand tracking data: ${error}`);
-      }
-    }
-  };
-
-  const handleControllerTracking = (frame: XRFrame, referenceSpace: XRReferenceSpace) => {
-    const now = performance.now();
-    const sendInterval = 1000 / 30; // 30 Hz
-    if (now - lastHandSendRef.current < sendInterval) {
-      return;
-    }
-    lastHandSendRef.current = now;
-    
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      return;
-    }
-  
-    const controllerData: any = {};
-  
-    for (const inputSource of (frame as any).session.inputSources) {
-      // Check if this is a controller (not a hand)
-      if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
-        const handedness = inputSource.handedness; // 'left' or 'right'
-        
-        // Get controller pose
-        const controllerPose = (frame as any).getPose(inputSource.gripSpace, referenceSpace);
-        
-        if (controllerPose) {
-          // Extract position and orientation from XRRigidTransform
-          const position = [
-            controllerPose.transform.position.x,
-            controllerPose.transform.position.y,
-            controllerPose.transform.position.z
-          ];
-          const orientation = [
-            controllerPose.transform.orientation.x,
-            controllerPose.transform.orientation.y,
-            controllerPose.transform.orientation.z,
-            controllerPose.transform.orientation.w
-          ];
-          
-          // Get gamepad data for buttons and triggers
-          const gamepad = inputSource.gamepad;
-          let trigger = 0.0;
-          let grip = 0.0;
-          let buttons: boolean[] = [];
-          
-          if (gamepad) {
-            // Standard WebXR controller mapping:
-            // Button 0: Trigger
-            // Button 1: Grip/Squeeze
-            // Button 2: Touchpad/Thumbstick (if present)
-            // Button 3: Menu button (if present)
-            trigger = gamepad.buttons[0]?.value || 0.0;
-            grip = gamepad.buttons[1]?.value || 0.0;
-            buttons = gamepad.buttons.map(button => button.pressed);
-          }
-          
-          controllerData[handedness] = {
-            position: position,
-            orientation: orientation,
-            trigger: trigger,
-            grip: grip,
-            buttons: buttons
-          };
-        }
-      }
-    }
-  
-    if (Object.keys(controllerData).length > 0) {
-      try {
-        wsRef.current!.send(JSON.stringify(controllerData));
-      } catch (error) {
-        console.log(`Failed to send controller tracking data: ${error}`);
-      }
-    }
-  };
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>

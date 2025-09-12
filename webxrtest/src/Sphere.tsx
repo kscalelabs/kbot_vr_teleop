@@ -1,68 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
+import { handleHandTracking, handleControllerTracking } from './webxrTracking';
 
-// WebXR type declarations
-declare global {
-  interface Navigator {
-    xr?: XRSystem;
-  }
-  
-  interface XRSystem {
-    isSessionSupported(mode: string): Promise<boolean>;
-    requestSession(mode: string, options?: any): Promise<XRSession>;
-  }
-  
-  interface XRSession {
-    renderState: XRRenderState;
-    requestReferenceSpace(type: string): Promise<XRReferenceSpace>;
-    requestAnimationFrame(callback: XRFrameRequestCallback): number;
-    updateRenderState(state: any): void;
-  }
-  
-  interface XRRenderState {
-    baseLayer?: XRWebGLLayer;
-  }
-  
-  interface XRWebGLLayer {
-    framebuffer: WebGLFramebuffer | null;
-    getViewport(view: XRView): XRViewport;
-  }
-  
-  interface XRFrame {
-    getViewerPose(referenceSpace: XRReferenceSpace): XRPose | null;
-  }
-  
-  interface XRPose {
-    views: XRView[];
-  }
-  
-  interface XRView {
-    transform: XRRigidTransform;
-    projectionMatrix: Float32Array;
-  }
-  
-  interface XRRigidTransform {
-    inverse: { matrix: Float32Array };
-  }
-  
-  interface XRViewport {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }
-  
-  interface XRReferenceSpace {}
-  
-  type XRFrameRequestCallback = (time: DOMHighResTimeStamp, frame: XRFrame) => void;
-  
-  var XRWebGLLayer: {
-    new (session: XRSession, gl: WebGLRenderingContext): XRWebGLLayer;
-  };
-  
-  interface WebGLRenderingContext {
-    makeXRCompatible(): Promise<void>;
-  }
-}
 const flipCenter = (centerX: number, centerY: number, width: number, height: number) => {
   return [centerX, centerY];
 };
@@ -74,6 +12,8 @@ interface BillboardProps {
 }
 
 export default function Billboard({ stream1, stream2, url }: BillboardProps) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const lastHandSendRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef1 = useRef<HTMLVideoElement>(null);
   const videoRef2 = useRef<HTMLVideoElement>(null);
@@ -98,6 +38,13 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
   const updateStatus = (msg: string) => setStatus(msg);
 
   const startVR = async () => {
+    // Setup WebSocket connection for hand tracking data (example)
+    if (!wsRef.current) {
+      wsRef.current = new WebSocket(url);
+      wsRef.current.onopen = () => {
+        wsRef.current!.send(JSON.stringify({ role: "teleop", robot_id: "motion" }));
+      };
+    }
     updateStatus("Starting VR Billboard...");
   
     if (!navigator.xr) {
@@ -316,6 +263,10 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     const centerBuffer = gl.createBuffer()!;
   
     const onXRFrame = (time: DOMHighResTimeStamp, frame: XRFrame) => {
+      // Example: send hand tracking data if WebSocket is open
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
+      }
       const pose = frame.getViewerPose(refSpace);
       if (!pose) {
         session.requestAnimationFrame(onXRFrame);
