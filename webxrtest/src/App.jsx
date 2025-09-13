@@ -3,11 +3,12 @@ import VideoScreenWeb from './Video.tsx';
 import SideBySideVideo from './SideBySideVideo.tsx';
 import Billboard from './Billboard.tsx';
 import Sphere from './Sphere.tsx';
+import ShaderTest from './ShaderTest.tsx';
 
 function App() {
   const portString = window.location.port ? `:${window.location.port}` : '';
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
-  const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", "billboard", or "sphere"
+  const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", "billboard", "sphere", or "shaderTest"
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
@@ -185,6 +186,22 @@ function App() {
             >
               Sphere
             </button>
+            <button
+              onClick={() => setViewMode('shaderTest')}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: viewMode === 'shaderTest' ? '#007bff' : '#333333',
+                color: viewMode === 'shaderTest' ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'shaderTest' ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Shader Test
+            </button>
           </div>
         </div>
 
@@ -272,7 +289,11 @@ function App() {
         )}
       </div>
 
-      {isConnected && (
+      {(viewMode === 'shaderTest') ? (
+        <div style={{ width: '100%', maxWidth: '1200px' }}>
+          <ShaderTest />
+        </div>
+      ) : isConnected && (
         <div style={{ width: '100%', maxWidth: '1200px' }}>
           {/* Always mount VideoScreenWeb when connected - it provides the streams */}
           <VideoScreenWeb
@@ -288,7 +309,6 @@ function App() {
 
           {/* Conditionally mount the view component based on selected mode */}
           { viewMode === 'billboard' ? (
-       
               <Billboard 
                 stream={streams[0] || null}
                 url={url}

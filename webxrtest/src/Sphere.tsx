@@ -136,11 +136,11 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
               gl_FragColor = vec4(1.0,0.0,0.0,1.0); // red dot
               return;
           }
-          float k1 = 0.0;
-          float k2 = 0.01;
-          // float fx=300;
-          // float cx = 640;
-          // float cy=540;
+          float k1=0.0;
+          float k2=0.01;
+          float fx=300;
+          float cx = 640;
+          float cy=540;
           float a = vPos.x / vPos.z;
           float b = vPos.y / vPos.z;
           float r = sqrt(a * a + b * b);
@@ -148,8 +148,8 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
           float theta_d = theta*(1.0 + k1*theta*theta + k2*theta*theta*theta*theta);
           float x_prime = (theta_d / r) * a;
           float y_prime = (theta_d / r) * b;
-          vec2 uv = (x_prime, y_prime);
-          // uv /= imgSize;
+          vec2 uv = (fx*x_prime+cx, fx*y_prime+cy);
+          uv /= imgSize;
           // uv.y = 1.0 - uv.y;
           // uv.x = 1.0 - uv.x;
           if (r > 1.0) {
