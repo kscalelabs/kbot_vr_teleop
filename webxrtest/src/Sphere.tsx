@@ -132,30 +132,28 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
       uniform int isCenter;
   
       void main() {
-          if (isCenter == 1) {
-              gl_FragColor = vec4(1.0,0.0,0.0,1.0); // red dot
-              return;
-          }
-          float k1=0.0;
-          float k2=0.01;
-          float fx=300;
-          float cx = 640;
-          float cy=540;
+          float k1 = 0.0;
+          float k2 = 0.01;
+          float fx = 300.0;
+          float fy = 300.0;
+          float cx = 640.0;
+          float cy = 540.0;
           float a = vPos.x / vPos.z;
           float b = vPos.y / vPos.z;
           float r = sqrt(a * a + b * b);
-          float theta = atan(r,1.0);
-          float theta_d = theta*(1.0 + k1*theta*theta + k2*theta*theta*theta*theta);
+          float theta = atan(r, 1.0);
+          float theta_d = theta * (1.0 + k1 * theta * theta + k2 * theta * theta * theta * theta);
           float x_prime = (theta_d / r) * a;
           float y_prime = (theta_d / r) * b;
-          vec2 uv = (fx*x_prime+cx, fx*y_prime+cy);
-          uv /= imgSize;
-          // uv.y = 1.0 - uv.y;
-          // uv.x = 1.0 - uv.x;
-          if (r > 1.0) {
-              gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+          float u = fx * x_prime + cx;
+          float v = fy * y_prime + cy;
+          vec2 uv = vec2(u, v) / imgSize;
+          uv.x = 1.0 - uv.x;
+          uv.y = 1.0 - uv.y;
+          if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+            gl_FragColor = vec4(0.0,0.0,0.0,1.0);
           } else {
-              gl_FragColor = texture2D(videoTexture, uv);
+            gl_FragColor = texture2D(videoTexture, uv);
           }
       }
     `;
