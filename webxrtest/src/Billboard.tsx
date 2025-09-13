@@ -68,7 +68,7 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     updateStatus('Loading video...');
 
     let videoReady = false;
-    if (stream) {
+    if (true) {
       try {
         await new Promise<void>((resolve, reject) => {
           if (video.readyState >= 2) {
@@ -354,17 +354,6 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
 
         // Draw the curved billboard
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
-        // Render STL meshes using raw WebGL only if loaded
-        if (stlReady && stlGeometriesRef.current.left) {
-          const leftTransform = new THREE.Matrix4().makeTranslation(0, 1.5, -2);
-          renderSTLGeometry(gl, stlGeometriesRef.current.left, leftTransform);
-        }
-        if (stlReady && stlGeometriesRef.current.right) {
-          const rightTransform = new THREE.Matrix4().makeTranslation(0.5, 1.5, -2);
-          renderSTLGeometry(gl, stlGeometriesRef.current.right, rightTransform);
-        }
-        // Render a ring of red triangles for test
-        renderTestRing(gl);
       });
 
       session.requestAnimationFrame(onXRFrame);
@@ -460,7 +449,7 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
       
       <video
         ref={videoRef}
-        src="/pi_L_web.mp4"
+        src="/left_web.mp4"
         crossOrigin="anonymous"
         style={{ display: 'none' }}
         muted

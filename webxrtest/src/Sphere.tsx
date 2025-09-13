@@ -76,7 +76,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     // Wait for videos to be ready
     const videoPromises: Promise<void>[] = [];
   
-    if (stream1) {
+    if (true) {
       videoPromises.push(new Promise<void>((resolve, reject) => {
         if (video1.readyState >= 2) return resolve();
         const onLoaded = () => { video1.removeEventListener("loadeddata", onLoaded); resolve(); };
@@ -85,7 +85,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
         video1.load();
       }));
     }
-    if (stream2) {
+    if (true) {
       videoPromises.push(new Promise<void>((resolve, reject) => {
         if (video2.readyState >= 2) return resolve();
         const onLoaded = () => { video2.removeEventListener("loadeddata", onLoaded); resolve(); };
@@ -96,8 +96,8 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     }
     if (videoPromises.length > 0) await Promise.all(videoPromises);
   
-    if (stream1) await video1.play();
-    if (stream2) await video2.play();
+    if (true) await video1.play();
+    if (true) await video2.play();
     updateStatus("Videos playing");
   
     // ======================
@@ -143,6 +143,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
           vec2 uv = center + rr * radius * vec2(cos(theta), sin(theta));
           uv /= imgSize;
           uv.y = 1.0 - uv.y;
+          uv.x = 1.0 - uv.x;
           if (rr > 1.0) {
               gl_FragColor = vec4(0.0,0.0,0.0,1.0);
           } else {
@@ -251,14 +252,14 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     const computeCenter3D = (cx: number, cy: number) => {
       const nx = (cx / 1280) * 2 - 1;
       const ny = (cy / 1080) * 2 - 1;
-      const phi = nx * (Math.PI * 220 / 360);
+      const phi = nx * (Math.PI * 171 / 360);
       const theta = ny * 2 * Math.PI;
       const r = 1.0;
       return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
     };
   
-    const centerPointLeft = computeCenter3D(634, 446);
-    const centerPointRight = computeCenter3D(686, 516);
+    const centerPointLeft = computeCenter3D(640, 540);
+    const centerPointRight = computeCenter3D(640,540);
   
     const centerBuffer = gl.createBuffer()!;
   
@@ -284,8 +285,8 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
         const video = eyeIndex === 0 ? video1 : video2;
         const tex = eyeIndex === 0 ? texture1 : texture2;
         const center3D = eyeIndex === 0 ? centerPointLeft : centerPointRight;
-        const radius = eyeIndex === 0 ? 541.0 : 538.0;
-        const center2D = eyeIndex === 0 ? [634.0, 446.0] : [686.0, 516.0];
+        const radius = 640;
+        const center2D = [640, 540];
   
         // bind video texture
         gl.activeTexture(gl.TEXTURE0);
@@ -333,8 +334,8 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
         </button>
       )}
       <div>{status}</div>
-      <video ref={videoRef1} src="/pi_L_web.mp4" style={{ display: "none" }} muted playsInline />
-      <video ref={videoRef2} src="/pi_R_web.mp4" style={{ display: "none" }} muted playsInline />
+      <video ref={videoRef1} src="/left_web.mp4" style={{ display: "none" }} muted playsInline />
+      <video ref={videoRef2} src="/right_web.mp4" style={{ display: "none" }} muted playsInline />
       <canvas ref={canvasRef} style={{ width: "100%", height: "400px" }} />
     </div>
   );
