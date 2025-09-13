@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
+import * as THREE from 'three';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { handleHandTracking, handleControllerTracking } from './webxrTracking';
 
 interface BillboardProps {
@@ -14,6 +16,13 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
   const [started, setStarted] = useState(false);
   const [status, setStatus] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
+  const threeSceneRef = useRef<THREE.Scene|null>(null);
+  const threeRendererRef = useRef<THREE.WebGLRenderer|null>(null);
+  const leftHandMeshRef = useRef<THREE.Mesh|null>(null);
+  const rightHandMeshRef = useRef<THREE.Mesh|null>(null);
+  const videoPlaneMeshRef = useRef<THREE.Mesh|null>(null);
+  const videoTextureRef = useRef<THREE.VideoTexture|null>(null);
+  const [stlReady, setStlReady] = useState(false);
   
   useEffect(() => {
     // Use the first available stream for the billboard
@@ -22,6 +31,193 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
       videoRef.current.play().catch(e => console.log(`Video play warning: ${e.message}`));
     }
   }, [stream]);
+
+  // Create video plane when stream and scene are ready
+  useEffect(() => {
+    if (stream && videoRef.current && threeSceneRef.current && !videoPlaneMeshRef.current) {
+      // Create video texture
+      const videoTexture = new THREE.VideoTexture(videoRef.current);
+      videoTexture.minFilter = THREE.LinearFilter;
+      videoTexture.magFilter = THREE.LinearFilter;
+      videoTextureRef.current = videoTexture;
+
+      // Create curved billboard geometry matching video aspect ratio (1280x1080)
+      const videoAspectRatio = 1280 / 1080; // 1.185
+      const height = 2.0;
+      const width = height * videoAspectRatio; // Maintain video aspect ratio
+      const segments = 32;
+      const planeGeometry = new THREE.PlaneGeometry(width, height, segments, segments);
+      
+      // No curvature - keep plane flat
+
+      // Create material with video texture
+      const planeMaterial = new THREE.MeshBasicMaterial({ 
+        map: videoTexture,
+        side: THREE.DoubleSide
+      });
+
+      // Create mesh and position it
+      const videoPlaneMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+      videoPlaneMesh.position.set(0, 0, -2); // Position in front of user
+      
+      videoPlaneMeshRef.current = videoPlaneMesh;
+      threeSceneRef.current.add(videoPlaneMesh);
+    }
+  }, [stream, threeSceneRef.current]);
+
+  // Load STL models when component mounts
+  useEffect(() => {
+    const loader = new STLLoader();
+    
+    // Load STL file
+    loader.load(
+      '/prt0001.stl', // Path to STL file
+      (geometry) => {
+        // Create material that responds to ambient light
+        const material = new THREE.MeshLambertMaterial({ 
+          color: 0x888888, // Gray color
+          side: THREE.DoubleSide 
+        });
+
+        // Create left and right hand meshes from the same geometry
+        const leftMesh = new THREE.Mesh(geometry, material);
+        const rightMesh = new THREE.Mesh(geometry, material);
+
+        // Calculate appropriate scale based on STL bounding box
+        geometry.computeBoundingBox();
+        const boundingBox = geometry.boundingBox!;
+        const size = boundingBox.max.clone().sub(boundingBox.min);
+        const maxDimension = Math.max(size.x, size.y, size.z);
+        
+        // Scale to make the largest dimension about 0.1 units (adjustable)
+        const targetSize = 0.1;
+        const scale = targetSize / maxDimension;
+        
+        console.log('STL dimensions:', size);
+        console.log('Calculated scale:', scale);
+        
+        // Apply scale and flip on all axes
+        leftMesh.scale.set(-scale, -scale, -scale);
+        rightMesh.scale.set(-scale, -scale, -scale);
+
+        // Initially hide meshes
+        leftMesh.visible = false;
+        rightMesh.visible = false;
+
+        leftHandMeshRef.current = leftMesh;
+        rightHandMeshRef.current = rightMesh;
+
+        // Add to scene if it exists
+        if (threeSceneRef.current) {
+          threeSceneRef.current.add(leftMesh);
+          threeSceneRef.current.add(rightMesh);
+        }
+
+        setStlReady(true);
+        console.log('STL model loaded successfully');
+        console.log('STL bounding box:', geometry.boundingBox);
+        console.log('STL scale applied:', scale);
+      },
+      (progress) => {
+        console.log('STL loading progress:', (progress.loaded / progress.total * 100) + '%');
+      },
+      (error) => {
+        console.error('Error loading STL:', error);
+        // Fallback to cubes if STL fails
+        createFallbackCubes();
+      }
+    );
+
+    // Clean up meshes when component unmounts
+    return () => {
+      if (leftHandMeshRef.current && threeSceneRef.current) {
+        threeSceneRef.current.remove(leftHandMeshRef.current);
+        leftHandMeshRef.current = null;
+      }
+      if (rightHandMeshRef.current && threeSceneRef.current) {
+        threeSceneRef.current.remove(rightHandMeshRef.current);
+        rightHandMeshRef.current = null;
+      }
+    };
+  }, []);
+
+  // Fallback function to create cubes if STL loading fails
+  const createFallbackCubes = () => {
+    if (threeSceneRef.current && !leftHandMeshRef.current && !rightHandMeshRef.current) {
+      const cubeGeometry = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+      const cubeMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+
+      const leftCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+      const rightCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+
+      leftCube.visible = false;
+      rightCube.visible = false;
+
+      leftHandMeshRef.current = leftCube;
+      rightHandMeshRef.current = rightCube;
+
+      threeSceneRef.current.add(leftCube);
+      threeSceneRef.current.add(rightCube);
+      
+      setStlReady(true);
+    }
+  };
+
+  // Initialize Three.js scene for cube rendering
+  const initThreeScene = () => {
+    if (!threeSceneRef.current) {
+      const scene = new THREE.Scene();
+      
+      // Add lighting for the cubes
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
+      
+      threeSceneRef.current = scene;
+    }
+  };
+
+  // Update STL mesh positions based on hand tracking
+  const updateMeshPositions = (handPositions: any) => {
+    if (!threeSceneRef.current || !stlReady) return;
+    
+    // Add meshes to scene if they exist but aren't added yet
+    if (leftHandMeshRef.current && !threeSceneRef.current.children.includes(leftHandMeshRef.current)) {
+      threeSceneRef.current.add(leftHandMeshRef.current);
+    }
+    if (rightHandMeshRef.current && !threeSceneRef.current.children.includes(rightHandMeshRef.current)) {
+      threeSceneRef.current.add(rightHandMeshRef.current);
+    }
+    
+    // Update left hand mesh
+    if (handPositions.left && leftHandMeshRef.current) {
+      const { position, orientation } = handPositions.left;
+      leftHandMeshRef.current.position.set(position.x, position.y, position.z);
+      leftHandMeshRef.current.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+      leftHandMeshRef.current.visible = true;
+    } else if (leftHandMeshRef.current) {
+      leftHandMeshRef.current.visible = false;
+    }
+
+    // Update right hand mesh
+    if (handPositions.right && rightHandMeshRef.current) {
+      const { position, orientation } = handPositions.right;
+      rightHandMeshRef.current.position.set(position.x, position.y, position.z);
+      rightHandMeshRef.current.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+      rightHandMeshRef.current.visible = true;
+    } else if (rightHandMeshRef.current) {
+      rightHandMeshRef.current.visible = false;
+    }
+
+    // Hide meshes if no hand positions
+    if (!handPositions.left && !handPositions.right) {
+      if (leftHandMeshRef.current) leftHandMeshRef.current.visible = false;
+      if (rightHandMeshRef.current) rightHandMeshRef.current.visible = false;
+    }
+  };
 
   const updateStatus = (msg: string) => {
     setStatus(msg);
@@ -46,312 +242,95 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl', { xrCompatible: true }) as WebGLRenderingContext | null;
-    if (!gl) {
-      updateStatus('WebGL not supported');
-      return;
-    }
-
-    const video = videoRef.current!;
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'metadata';
-
-    updateStatus('Loading video...');
-    
-    const waitForVideo = (video: HTMLVideoElement): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        if (video.readyState >= 2) {
-          resolve();
-          return;
-        }
-        
-        const onLoadedData = () => {
-          video.removeEventListener('loadeddata', onLoadedData);
-          video.removeEventListener('error', onError);
-          resolve();
-        };
-        
-        const onError = () => {
-          video.removeEventListener('loadeddata', onLoadedData);
-          video.removeEventListener('error', onError);
-          reject(new Error(`Video failed to load`));
-        };
-        
-        video.addEventListener('loadeddata', onLoadedData);
-        video.addEventListener('error', onError);
-        video.load();
-      });
-    };
-    waitForVideo(video).then(() => {
-      updateStatus('Video loaded, starting playback...');
-      video.play().catch(e => console.log(`Video play warning: ${e.message}`));
+    // Create Three renderer and enable XR
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+    });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+  
+    // Tell Three which reference space to use internally
+    renderer.xr.setReferenceSpaceType('viewer');
+  
+    threeRendererRef.current = renderer;
+  
+    // Request the XR session with appropriate features
+    const session = await navigator.xr.requestSession('immersive-vr', {
+      requiredFeatures: ['local-floor', 'viewer', 'hand-tracking'],
+      optionalFeatures: ['layers'],
+    });
+    updateStatus('XR session created');
+  
+    // Hand the session to Three (this sets up XRWebGLLayer, etc.)
+    await renderer.xr.setSession(session);
+    updateStatus('Three.js XR session set');
+  
+    // Get the reference space from Three (do NOT call session.requestReferenceSpace)
+    const refSpace = renderer.xr.getReferenceSpace();
+  
+    // Setup WS (non-blocking) for tracking data
+    await setupTrackingWebSocket().catch(err => {
+      console.warn('WebSocket setup failed, continuing without it:', err);
+      updateStatus('WebSocket connection failed, continuing with XR...');
     });
   
-
-    // Shaders for curved billboard
-    const vertexShaderSource = `
-      attribute vec3 position;
-      attribute vec2 uv;
-      varying vec2 vUV;
-      uniform mat4 projectionMatrix;
-      uniform mat4 modelViewMatrix;
-      
-      void main() {
-        vUV = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `;
-
-    const fragmentShaderSource = `
-      precision mediump float;
-      varying vec2 vUV;
-      uniform sampler2D videoTexture;
-      
-      void main() {
-        vec4 color = texture2D(videoTexture, vUV);
-        gl_FragColor = color;
-      }
-    `;
-
-    const compileShader = (src: string, type: number) => {
-      const shader = gl.createShader(type)!;
-      gl.shaderSource(shader, src);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        const error = gl.getShaderInfoLog(shader);
-        updateStatus(`Shader compile error: ${error}`);
-      }
-      return shader;
-    };
-
-    const vertexShader = compileShader(vertexShaderSource, gl.VERTEX_SHADER);
-    const fragmentShader = compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER);
-
-    const program = gl.createProgram()!;
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      const error = gl.getProgramInfoLog(program);
-      updateStatus(`Program link error: ${error}`);
-    }
-    gl.useProgram(program);
-
-    // Create flat billboard geometry
-    const createCurvedBillboard = () => {
-      const vertices: number[] = [];
-      const uvs: number[] = [];
-      const indices: number[] = [];
-    
-      // For 1280x1080 stream: width=1280, height=1080
-      const streamWidth = 1280;
-      const streamHeight = 1080;
-      const aspectRatio = streamWidth / streamHeight; // 1280/1080 ≈ 1.185
-      
-      // Set comfortable dimensions for flat plane
-      const maxHeight = 3.0; // Comfortable height for VR viewing
-      const height = maxHeight;
-      // Use full width since there's no curvature to compensate for
-      const width = height * aspectRatio; // Full width for flat plane
-      
-      console.log(`Billboard base dimensions: ${width.toFixed(2)}w x ${height.toFixed(2)}h (aspect ratio: ${aspectRatio.toFixed(3)})`);
-      
-      const segments = 24; // Segments for smooth rendering
-      const distance = 4.5; // Distance from origin
-      
-      // Generate vertices for flat surface
-      for (let i = 0; i <= segments; i++) {
-        for (let j = 0; j <= segments; j++) {
-          const u = i / segments;
-          const v = j / segments;
-          
-          // Map to billboard coordinates for flat plane
-          const x = (u - 0.5) * width;
-          const y = (v - 0.5) * height;
-          
-          // Create flat plane positioned in front of user
-          const flatX = x;
-          const flatY = y;
-          const flatZ = -distance; // Fixed distance, no curvature
-          
-          vertices.push(flatX, flatY, flatZ);
-          uvs.push(u, 1 - v); // Flip V coordinate to fix vertical flip
-        }
-      }
-      
-      // Generate indices for triangles
-      for (let i = 0; i < segments; i++) {
-        for (let j = 0; j < segments; j++) {
-          const a = i * (segments + 1) + j;
-          const b = a + segments + 1;
-          
-          // First triangle
-          indices.push(a, b, a + 1);
-          // Second triangle
-          indices.push(b, b + 1, a + 1);
-        }
-      }
-      
-      return { vertices, uvs, indices };
-    };
-
-    const { vertices, uvs, indices } = createCurvedBillboard();
-
-    // Create buffers
-    const vertexBuffer = gl.createBuffer()!;
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-
-    const uvBuffer = gl.createBuffer()!;
-    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uvs), gl.STATIC_DRAW);
-
-    const indexBuffer = gl.createBuffer()!;
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
-
-    // Get attribute and uniform locations
-    const positionLoc = gl.getAttribLocation(program, 'position');
-    const uvLoc = gl.getAttribLocation(program, 'uv');
-    const projectionMatrixLoc = gl.getUniformLocation(program, 'projectionMatrix');
-    const modelViewMatrixLoc = gl.getUniformLocation(program, 'modelViewMatrix');
-    const videoUniformLoc = gl.getUniformLocation(program, 'videoTexture');
-
-    // Create texture
-    const texture = gl.createTexture()!;
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    let session: XRSession;
-
-    try {
-      updateStatus('Requesting XR session...');
-      session = await navigator.xr.requestSession('immersive-vr', {
-        optionalFeatures: ['hand-tracking']
-      });
-      updateStatus('XR session created');
-    } catch (err) {
-      updateStatus(`Failed to start XR session: ${err}`);
-      return;
-    }
-
-    await gl.makeXRCompatible();
-    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
-
-    const refSpace = await session.requestReferenceSpace('viewer');
-    updateStatus('Reference space created, starting render loop...');
-
-    // Setup WebSocket connection for hand tracking data
-    await setupHandTrackingWebSocket();
+    // Init scene (lights, etc.). Your video plane effect will attach once the scene exists.
+    initThreeScene();
+  
+     // Create a stable camera (Three will substitute XR camera internally)
+     // Video aspect ratio: 1280x1080 = 1.185
+     const videoAspectRatio = 1280 / 1080;
+     const camera = new THREE.PerspectiveCamera(
+       75, // Wider field of view to better frame the video
+       videoAspectRatio, // Match camera aspect ratio to video
+       0.01,
+       100
+     );
+  
+     // Position camera to look directly at the center of the video plane
+     camera.position.set(0, 0, 0); // Camera at origin
+     camera.lookAt(0, 0, -2); // Look at center of video plane (which is at z=-2)
+     
+     // Handle resize
+     const onResize = () => {
+       // Keep camera aspect ratio matched to video, not window
+       camera.aspect = videoAspectRatio;
+       camera.updateProjectionMatrix();
+       renderer.setSize(window.innerWidth, window.innerHeight);
+     };
+    window.addEventListener('resize', onResize);
 
     session.addEventListener('end', () => {
       updateStatus('XR session ended');
+      window.removeEventListener('resize', onResize);
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
       }
     });
 
-    // Matrix utilities
-    const multiplyMatrices = (a: Float32Array, b: Float32Array): Float32Array => {
-      const result = new Float32Array(16);
-      for (let i = 0; i < 4; i++) {
-        for (let j = 0; j < 4; j++) {
-          result[i * 4 + j] = 
-            a[i * 4 + 0] * b[0 * 4 + j] +
-            a[i * 4 + 1] * b[1 * 4 + j] +
-            a[i * 4 + 2] * b[2 * 4 + j] +
-            a[i * 4 + 3] * b[3 * 4 + j];
-        }
-      }
-      return result;
-    };
-
-    const createIdentityMatrix = () => {
-      return new Float32Array([
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-      ]);
-    };
-
-    // Create a fixed world-space model matrix for the billboard
-    const createBillboardModelMatrix = () => {
-      // Identity matrix - billboard stays in world space
-      return createIdentityMatrix();
-    };
-
-    const onXRFrame = (time: DOMHighResTimeStamp, frame: XRFrame) => {
-      const pose = frame.getViewerPose(refSpace);
-      if (!pose) {
-        session.requestAnimationFrame(onXRFrame);
-        return;
-      }
-
-      // Handle hand tracking
-      if (hands) {
-      handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
-      } else {
-        handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef);
-      }
-
-      gl.bindFramebuffer(gl.FRAMEBUFFER, session.renderState.baseLayer!.framebuffer);
-      gl.clearColor(0.0, 0.0, 0.0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gl.enable(gl.DEPTH_TEST);
-
-      pose.views.forEach((view) => {
-        const viewport = session.renderState.baseLayer!.getViewport(view);
-        if (!viewport) return;
-        
-        gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-
-        // Check if video is ready
-        if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-          return;
-        }
-
-        // Update texture with video frame
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-
-        // Set up vertex attributes
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-        gl.enableVertexAttribArray(positionLoc);
-        gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
-        gl.enableVertexAttribArray(uvLoc);
-        gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 0, 0);
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
-        // Calculate proper model-view matrix
-        const modelMatrix = createBillboardModelMatrix();
-        const viewMatrix = view.transform.inverse.matrix;
-        const modelViewMatrix = multiplyMatrices(viewMatrix, modelMatrix);
-
-        // Set uniforms
-        gl.uniformMatrix4fv(projectionMatrixLoc, false, view.projectionMatrix);
-        gl.uniformMatrix4fv(modelViewMatrixLoc, false, modelViewMatrix);
-        gl.uniform1i(videoUniformLoc, 0);
-
-        // Draw the curved billboard
-        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
-      });
-
-      session.requestAnimationFrame(onXRFrame);
-    };
-
-    session.requestAnimationFrame(onXRFrame);
+    // Use Three's XR render loop to obtain XRFrame
+    renderer.setAnimationLoop((time, frame) => {
+      if (!frame || !threeSceneRef.current) return;
+      
+      // Tracking → positions/orientations → STL mesh updates
+      let handPositions = null;
+       if (hands) {
+         handPositions = handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
+       } else {
+         handPositions = handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef);
+       }
+       if (handPositions) updateMeshPositions(handPositions);
+  
+      renderer.render(threeSceneRef.current, camera);
+    });
   };
+  
 
-  const setupHandTrackingWebSocket = () => {
+  const setupTrackingWebSocket = () => {
     return new Promise((resolve, reject) => {
       try {
         let webSocket = new WebSocket(url);
@@ -387,36 +366,34 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       {!started && (
-        <div>
+        <div style={{ marginBottom: '20px' }}>
           <button
+            onClick={() => { 
+              setStarted(true); 
+              startVR(); 
+            }}
             style={{ 
-              fontSize: '24px', 
-              padding: '12px 24px',
-              marginBottom: '20px',
+              padding: '15px 30px', 
+              fontSize: '18px', 
               backgroundColor: '#007bff',
               color: 'white',
               border: 'none',
               borderRadius: '5px',
               cursor: 'pointer'
             }}
-            onClick={async () => {
-              setStarted(true);
-              await startVR();
-            }}
           >
-            Start VR Billboard
+            Start VR Billboard ({hands ? 'Hand' : 'Controller'} Tracking)
           </button>
         </div>
       )}
       
       {status && (
         <div style={{ 
+          marginBottom: '20px', 
           padding: '10px', 
           backgroundColor: '#f8f9fa', 
           border: '1px solid #dee2e6', 
-          borderRadius: '5px',
-          marginBottom: '10px',
-          fontSize: '14px'
+          borderRadius: '4px'
         }}>
           Status: {status}
         </div>
@@ -424,11 +401,12 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
       
       <video
         ref={videoRef}
-        crossOrigin="anonymous"
         style={{ display: 'none' }}
         muted
         playsInline
+        autoPlay
       />
+      
       <canvas 
         ref={canvasRef} 
         style={{ 

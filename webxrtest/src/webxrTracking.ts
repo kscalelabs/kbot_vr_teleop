@@ -73,15 +73,26 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
 export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandSendRef) {
   const now = performance.now();
   const sendInterval = 1000 / 30; // 30 Hz
-  if (now - lastHandSendRef.current < sendInterval) return;
-  lastHandSendRef.current = now;
-  if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+  const shouldSend = now - lastHandSendRef.current >= sendInterval;
+  
+  if (shouldSend) {
+    lastHandSendRef.current = now;
+  }
+  
   const controllerData = {};
+  const controllerPositions = { left: null, right: null };
+  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
       const handedness = inputSource.handedness;
       const controllerPose = frame.getPose(inputSource.gripSpace, referenceSpace);
       if (controllerPose) {
+        // Extract controller position for STL rendering
+        controllerPositions[handedness] = {
+          position: controllerPose.transform.position,
+          orientation: controllerPose.transform.orientation
+        };
+        
         const position = [
           controllerPose.transform.position.x,
           controllerPose.transform.position.y,
@@ -112,11 +123,16 @@ export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandS
       }
     }
   }
-  if (Object.keys(controllerData).length > 0) {
+  
+  // Send WebSocket data only at specified interval
+  if (shouldSend && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(controllerData).length > 0) {
     try {
       wsRef.current.send(JSON.stringify(controllerData));
     } catch (error) {
       console.log(`Failed to send controller tracking data: ${error}`);
     }
   }
+  
+  // Always return controller positions for local rendering
+  return controllerPositions;
 }

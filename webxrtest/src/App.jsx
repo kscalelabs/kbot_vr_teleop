@@ -60,7 +60,7 @@ function App() {
           fontSize: '28px',
           fontWeight: 'bold'
         }}>
-          K-Scale Teleoperate
+          K-Scale
         </h1>
 
         {/* Tracking Mode Toggle */}

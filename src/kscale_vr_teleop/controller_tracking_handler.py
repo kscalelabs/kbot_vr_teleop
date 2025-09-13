@@ -49,7 +49,7 @@ class ControllerTrackingHandler:
 
         self.teleop_core = ControllerTeleopCore(udp_host, udp_port)
 
-    def handle_controller_tracking(self, event):
+    def handle_tracking(self, event):
         """
         Handle controller tracking data.
         Expected format:

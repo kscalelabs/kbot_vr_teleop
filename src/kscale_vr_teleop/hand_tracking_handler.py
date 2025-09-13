@@ -52,7 +52,7 @@ class HandTrackingHandler:
 
         self.teleop_core = TeleopCore(udp_host, udp_port)
 
-    def handle_hand_tracking(self,event):
+    def handle_tracking(self,event):
         if event.get('left') != None:
             left_mat_raw = event['left']
             left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
