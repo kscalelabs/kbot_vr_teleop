@@ -157,7 +157,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
           }
       }
     `;
-  
+
     const compileShader = (src: string, type: number) => {
       const shader = gl.createShader(type)!;
       gl.shaderSource(shader, src);
@@ -182,11 +182,12 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     // ================
     const segments = 256;
     const sphereRadius = 1.0;
+    const FOV=171; // degrees
     const positions: number[] = [];
     const indices: number[] = [];
   
     for (let y = 0; y <= segments; y++) {
-      const theta = (y / segments) * (Math.PI * 220 / 360);
+      const theta = (y / segments) * (Math.PI * FOV / 360);
       for (let x = 0; x <= segments; x++) {
         const phi = (x / segments) * 2.0 * Math.PI;
         positions.push(
@@ -258,7 +259,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     const computeCenter3D = (cx: number, cy: number) => {
       const nx = (cx / 1280) * 2 - 1;
       const ny = (cy / 1080) * 2 - 1;
-      const phi = nx * (Math.PI * 171 / 360);
+      const phi = nx * (Math.PI * FOV / 360);
       const theta = ny * 2 * Math.PI;
       const r = 1.0;
       return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
