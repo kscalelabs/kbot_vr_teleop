@@ -338,7 +338,8 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
         webSocket.onopen = () => {
           webSocket.send(JSON.stringify({
             role: "teleop",
-            robot_id: "motion"
+            robot_id: "motion",
+            control_type: hands ? "hand" : "controller"
           }));
           wsRef.current = webSocket;
           updateStatus('Hand tracking WebSocket connected');
