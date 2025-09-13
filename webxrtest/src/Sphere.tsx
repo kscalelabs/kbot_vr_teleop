@@ -136,15 +136,23 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
               gl_FragColor = vec4(1.0,0.0,0.0,1.0); // red dot
               return;
           }
-          vec3 dir = normalize(vPos);
-          float theta = atan(dir.y, dir.x);
-          float phi = atan(length(dir.xy), dir.z);
-          float rr = phi / radians(110.0);
-          vec2 uv = center + rr * radius * vec2(cos(theta), sin(theta));
-          uv /= imgSize;
-          uv.y = 1.0 - uv.y;
-          uv.x = 1.0 - uv.x;
-          if (rr > 1.0) {
+          float k1 = 0.0;
+          float k2 = 0.01;
+          // float fx=300;
+          // float cx = 640;
+          // float cy=540;
+          float a = vPos.x / vPos.z;
+          float b = vPos.y / vPos.z;
+          float r = sqrt(a * a + b * b);
+          float theta = atan(r,1.0);
+          float theta_d = theta*(1.0 + k1*theta*theta + k2*theta*theta*theta*theta);
+          float x_prime = (theta_d / r) * a;
+          float y_prime = (theta_d / r) * b;
+          vec2 uv = (x_prime, y_prime);
+          // uv /= imgSize;
+          // uv.y = 1.0 - uv.y;
+          // uv.x = 1.0 - uv.x;
+          if (r > 1.0) {
               gl_FragColor = vec4(0.0,0.0,0.0,1.0);
           } else {
               gl_FragColor = texture2D(videoTexture, uv);
