@@ -141,7 +141,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
           float a = vPos.x / vPos.z;
           float b = vPos.y / vPos.z;
           float r = sqrt(a * a + b * b);
-          float theta = atan(r, 1.0);
+          float theta = atan(r);
           float theta_d = theta * (1.0 + k1 * theta * theta + k2 * theta * theta * theta * theta);
           float x_prime = (theta_d / r) * a;
           float y_prime = (theta_d / r) * b;
@@ -182,7 +182,7 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
     // ================
     const segments = 256;
     const sphereRadius = 1.0;
-    const FOV=171; // degrees
+    const FOV=220; // degrees
     const positions: number[] = [];
     const indices: number[] = [];
   
