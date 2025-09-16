@@ -1,14 +1,8 @@
 import can, time, argparse
 import numpy as np
 
-parser = argparse.ArgumentParser(description='Set finger position via CAN')
-parser.add_argument('--finger', type=int, default=1, help='Finger ID (default: 1)')
-parser.add_argument('--canbus', type=int, default=0, help='CAN ID (default: 0)')
-parser.add_argument('--position', type=float, default=0, help='Position percentage 0-100')
-args = parser.parse_args()
-
 class ROHHands:
-    def __init__(self, left_canbus=0, right_canbus=1):
+    def __init__(self, left_canbus=3, right_canbus=2):
         self.left_bus = can.Bus(interface="socketcan", channel=f"can{left_canbus}", bitrate=1_000_000)
         self.right_bus = can.Bus(interface="socketcan", channel=f"can{right_canbus}", bitrate=1_000_000)
 
@@ -53,7 +47,7 @@ class ROHHands:
 
 if __name__ == "__main__":
     # make sine waves and send to hand
-    roh = ROHHands(left_canbus=args.canbus, right_canbus=args.canbus)
+    roh = ROHHands()
     while True:
         time_ms = int(round(time.time() * 1000))
         pos = (np.sin(time_ms / 1000) + 1) / 2 * 100
