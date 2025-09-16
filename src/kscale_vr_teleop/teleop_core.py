@@ -36,6 +36,12 @@ class TeleopCore:
         self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
         self.log_joint_angles(np.zeros(5), np.zeros(5))
 
+        # Gripper values from controller inputs (0.0 to 1.0)
+        self.right_gripper_value = 0.0
+        self.left_gripper_value = 0.0
+
+        self.use_fingers = False
+
     def update_head(self, matrix: np.ndarray):
         self.head_matrix = matrix
 
@@ -43,16 +49,53 @@ class TeleopCore:
         self.left_wrist_pose = wrist
         self.left_finger_poses = fingers
         rr.log('left_wrist', rr.Transform3D(translation=self.left_wrist_pose[:3, 3], mat3x3=self.left_wrist_pose[:3, :3], axis_length=0.05))
+        self.use_fingers = True
     
     def update_right_hand(self, wrist: np.ndarray, fingers: np.ndarray):
         self.right_wrist_pose = wrist
         self.right_finger_poses = fingers
         rr.log('right_wrist', rr.Transform3D(translation=self.right_wrist_pose[:3, 3], mat3x3=self.right_wrist_pose[:3, :3], axis_length=0.05))
+        self.use_fingers = True
+
+    def update_left_controller(self, pose: np.ndarray, gripper_value: float):
+        """Update left controller pose and gripper value"""
+        self.left_wrist_pose = pose
+        self.left_gripper_value = gripper_value
+        rr.log('left_controller', rr.Transform3D(
+            translation=self.left_wrist_pose[:3, 3], 
+            mat3x3=self.left_wrist_pose[:3, :3], 
+            axis_length=0.05
+        ))
+        self.use_fingers = False
+    
+    def update_right_controller(self, pose: np.ndarray, gripper_value: float):
+        """Update right controller pose and gripper value"""
+        self.right_wrist_pose = pose
+        self.right_gripper_value = gripper_value
+        rr.log('right_controller', rr.Transform3D(
+            translation=self.right_wrist_pose[:3, 3], 
+            mat3x3=self.right_wrist_pose[:3, :3], 
+            axis_length=0.05
+        ))
+        self.use_fingers = False
 
     def log_joint_angles(self, right_arm: list, left_arm: list):
         new_config = {k: right_arm[i] for i, k in enumerate(self.ik_solver.active_joints[:5])}
         new_config.update({k: left_arm[i] for i, k in enumerate(self.ik_solver.active_joints[5:])})
         self.urdf_logger.log(new_config)
+    
+    def _compute_gripper_from_fingers(self):
+        right_finger_spacing = np.linalg.norm(self.right_finger_poses[8,:3,3] - self.right_finger_poses[3,:3,3])
+        right_gripper_joint = 0.068*np.clip(right_finger_spacing/0.15, 0, 1)
+        left_finger_spacing = np.linalg.norm(self.left_finger_poses[8,:3,3] - self.left_finger_poses[3,:3,3])
+        left_gripper_joint = 0.068*np.clip(left_finger_spacing/0.15, 0, 1)
+        return right_gripper_joint, left_gripper_joint
+    
+    def _compute_gripper_from_controllers(self):
+        # Placeholder: map controller trigger/grip values to gripper joint positions
+        right_gripper_joint = 0.068 * (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
+        left_gripper_joint = 0.068 * (1.0 - self.left_gripper_value)
+        return right_gripper_joint, left_gripper_joint
 
     @profile
     def compute_joint_angles(self):
@@ -75,10 +118,11 @@ class TeleopCore:
         # rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
         left_arm_joints = joints[5:]
         right_arm_joints = joints[:5]
-        right_finger_spacing = np.linalg.norm(self.right_finger_poses[8,:3,3] - self.right_finger_poses[3,:3,3])
-        right_gripper_joint = 0.068*np.clip(right_finger_spacing/0.15, 0, 1)
-        left_finger_spacing = np.linalg.norm(self.left_finger_poses[8,:3,3] - self.left_finger_poses[3,:3,3])
-        left_gripper_joint = 0.068*np.clip(left_finger_spacing/0.15, 0, 1)
+
+        if self.use_fingers:
+            right_gripper_joint, left_gripper_joint = self._compute_gripper_from_fingers()
+        else:
+            right_gripper_joint, left_gripper_joint = self._compute_gripper_from_controllers()
 
         # Log gripper positions as scalars for timeseries visualization
         rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
