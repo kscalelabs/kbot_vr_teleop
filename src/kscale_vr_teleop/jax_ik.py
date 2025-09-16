@@ -39,15 +39,17 @@ class RobotInverseKinematics:
 
         # Create mapping from joint name to active joint index
         self.active_joint_indices = {}
-        for i, joint in enumerate(self.active_joints):
-            self.active_joint_indices[joint] = i
-
         upper_bounds = []
         lower_bounds = []
-        for joint in self.urdf.joints:
-            if joint.joint_type == 'revolute':
-                upper_bounds.append(joint.limit.upper)
-                lower_bounds.append(joint.limit.lower)
+        for i, joint in enumerate(self.active_joints):
+            self.active_joint_indices[joint] = i
+            upper_bounds.append(self.urdf.joint_map[joint].limit.upper)
+            lower_bounds.append(self.urdf.joint_map[joint].limit.lower)
+
+        # for joint in self.urdf.joints:
+        #     if joint.joint_type == 'revolute':
+        #         upper_bounds.append(joint.limit.upper)
+        #         lower_bounds.append(joint.limit.lower)
             # else:
             #     upper_bounds.append(np.inf)
             #     lower_bounds.append(-np.inf)
