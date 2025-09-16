@@ -146,8 +146,6 @@ async def handle_teleop(websocket, robot_id: str):
                     logger.error(f"Unknown tracking handler type: {type(tracking_handler)}")
 
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
-                # sleep 1/40
-                await asyncio.sleep(1/40)
                 
             except json.JSONDecodeError:
                 logger.error(f"Invalid JSON from teleop client for robot {robot_id}")
