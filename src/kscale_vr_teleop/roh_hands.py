@@ -54,3 +54,4 @@ if __name__ == "__main__":
         positions = np.array([pos, pos, pos, pos, pos, pos])
         roh.set_left_hand_joints(positions)
         roh.set_right_hand_joints(positions)
+        time.sleep(1/40)
