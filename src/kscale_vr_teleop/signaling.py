@@ -7,8 +7,7 @@ import os
 import argparse
 from typing import Dict, Optional
 import logging
-from kscale_vr_teleop.hand_tracking_handler import HandTrackingHandler
-from kscale_vr_teleop.controller_tracking_handler import ControllerTrackingHandler
+from kscale_vr_teleop.tracking_handler import TrackingHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,8 +18,7 @@ parser.add_argument('--tracking-mode', choices=['hand', 'controller'],
                    default=os.environ.get('TRACKING_MODE', 'hand'),
                    help='Tracking mode: hand or controller (default: hand)')
 
-# Global tracking handler - will be set based on mode
-tracking_handler = None
+tracking_handler = TrackingHandler()
 
 
 class RobotAppPair:
@@ -138,12 +136,7 @@ async def handle_teleop(websocket, robot_id: str):
                 # Parse the incoming message
                 data = json.loads(message)
                 # Process through appropriate tracking handler
-                if isinstance(tracking_handler, HandTrackingHandler):
-                    tracking_handler.handle_hand_tracking(data)
-                elif isinstance(tracking_handler, ControllerTrackingHandler):
-                    tracking_handler.handle_controller_tracking(data)
-                else:
-                    logger.error(f"Unknown tracking handler type: {type(tracking_handler)}")
+                tracking_handler.handle_hand_tracking(data)
 
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
                 
@@ -190,26 +183,10 @@ async def handler(websocket):
     #     logger.error(f"Error in handler: {e}")
 
 async def main():
-    global tracking_handler
-    
-    # Parse command line arguments
-    args = parser.parse_args()
-    tracking_mode = args.tracking_mode
-    
-    # Initialize the appropriate tracking handler
-    if tracking_mode == 'hand':
-        tracking_handler = HandTrackingHandler()
-        logger.info("Initialized Hand Tracking Handler")
-    elif tracking_mode == 'controller':
-        tracking_handler = ControllerTrackingHandler()
-        logger.info("Initialized Controller Tracking Handler")
-    else:
-        logger.error(f"Unknown tracking mode: {tracking_mode}")
-        return
     
     server = await websockets.serve(handler, "0.0.0.0", 8013, ping_interval=10,   # send a ping every 20s
     ping_timeout=300 )
-    logger.info(f"Robot-App signaling server running on ws://0.0.0.0:8013 with {tracking_mode} tracking")
+    logger.info(f"Robot-App signaling server running on ws://0.0.0.0:8013")
     
     try:
         await server.wait_closed()
