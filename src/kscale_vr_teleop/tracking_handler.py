@@ -3,6 +3,7 @@ import numpy as np
 import os
 import time
 from pathlib import Path
+from scipy.spatial.transform import Rotation
 from kscale_vr_teleop.util import fast_mat_inv
 from kscale_vr_teleop.teleop_core import TeleopCore
 
@@ -45,7 +46,7 @@ else:
     if not RERUN_AVAILABLE:
         print("Rerun visualization disabled - missing dependencies")
 
-class HandTrackingHandler:
+class TrackingHandler:
     def __init__(self, udp_host='10.42.0.1', udp_port=10000):
         self.udp_host = udp_host
         self.udp_port = udp_port
@@ -65,7 +66,7 @@ class HandTrackingHandler:
                 
                 # Convert quaternion to rotation matrix
                 qx, qy, qz, qw = orientation
-                rotation_matrix = self.quaternion_to_rotation_matrix(qx, qy, qz, qw)
+                rotation_matrix = Rotation.from_quat([qx, qy, qz, qw], scalar_first=False).as_matrix()
                 
                 # Create 4x4 transform matrix
                 left_controller_matrix = np.eye(4, dtype=np.float32)
@@ -100,7 +101,7 @@ class HandTrackingHandler:
                     return
                 # Convert quaternion to rotation matrix
                 qx, qy, qz, qw = orientation
-                rotation_matrix = self.quaternion_to_rotation_matrix(qx, qy, qz, qw)
+                rotation_matrix = Rotation.from_quat([qx, qy, qz, qw], scalar_first=False).as_matrix()
                 
                 # Create 4x4 transform matrix
                 right_controller_matrix = np.eye(4, dtype=np.float32)

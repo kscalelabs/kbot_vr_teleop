@@ -36,24 +36,9 @@ class TeleopCore:
         self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
         self.log_joint_angles(np.zeros(5), np.zeros(5))
 
-        # Controller poses instead of finger poses
-        self.right_controller_pose = np.eye(4, dtype=np.float32)
-        self.left_controller_pose = np.eye(4, dtype=np.float32)
-        
         # Gripper values from controller inputs (0.0 to 1.0)
         self.right_gripper_value = 0.0
         self.left_gripper_value = 0.0
-
-        # Default controller positions
-        self.left_controller_pose[:3,3] = np.array([0.2, 0.2, -0.4])
-        self.right_controller_pose[:3,3] = np.array([0.2, -0.2, -0.4])
-        default_controller_rotation = np.array([
-            [0, 0, -1],
-            [-1, 0, 0],
-            [0, 1, 0]
-        ])
-        self.left_controller_pose[:3,:3] = default_controller_rotation
-        self.right_controller_pose[:3,:3] = default_controller_rotation
 
         self.use_fingers = False
 
@@ -74,22 +59,22 @@ class TeleopCore:
 
     def update_left_controller(self, pose: np.ndarray, gripper_value: float):
         """Update left controller pose and gripper value"""
-        self.left_controller_pose = pose
+        self.left_wrist_pose = pose
         self.left_gripper_value = gripper_value
         rr.log('left_controller', rr.Transform3D(
-            translation=self.left_controller_pose[:3, 3], 
-            mat3x3=self.left_controller_pose[:3, :3], 
+            translation=self.left_wrist_pose[:3, 3], 
+            mat3x3=self.left_wrist_pose[:3, :3], 
             axis_length=0.05
         ))
         self.use_fingers = False
     
     def update_right_controller(self, pose: np.ndarray, gripper_value: float):
         """Update right controller pose and gripper value"""
-        self.right_controller_pose = pose
+        self.right_wrist_pose = pose
         self.right_gripper_value = gripper_value
         rr.log('right_controller', rr.Transform3D(
-            translation=self.right_controller_pose[:3, 3], 
-            mat3x3=self.right_controller_pose[:3, :3], 
+            translation=self.right_wrist_pose[:3, 3], 
+            mat3x3=self.right_wrist_pose[:3, :3], 
             axis_length=0.05
         ))
         self.use_fingers = False
