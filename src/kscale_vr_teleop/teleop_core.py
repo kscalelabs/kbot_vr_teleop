@@ -125,7 +125,13 @@ class TeleopCore:
             right_gripper_joint, left_gripper_joint = self._compute_gripper_from_controllers()
 
         # Compute finger joint angles (6 per hand: thumb_metacarpal + thumb + 4 fingers)
-        left_finger_angles, right_finger_angles = calculate_hand_joints_no_ik(self.left_finger_poses, self.right_finger_poses)
+        if self.use_fingers:
+            left_finger_angles, right_finger_angles = calculate_hand_joints_no_ik(self.left_finger_poses, self.right_finger_poses)
+        else:
+            left_finger_angles = np.zeros(6, dtype=np.float32)
+            right_finger_angles = np.zeros(6, dtype=np.float32)
+            left_finger_angles[2] = self.left_gripper_value
+            right_finger_angles[2] = self.right_gripper_value
         # Ensure finger angles are clipped to 0-1 (no trimming; keep all 6)
         right_finger_angles = np.clip(right_finger_angles, 0, 1)
         left_finger_angles = np.clip(left_finger_angles, 0, 1)
