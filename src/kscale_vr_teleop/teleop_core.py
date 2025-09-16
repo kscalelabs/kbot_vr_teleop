@@ -30,7 +30,7 @@ class TeleopCore:
         self.ik_solver = RobotInverseKinematics(self.urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
         self.base_to_head_transform = np.eye(4)
-        self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
+        # self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
 
         self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
         self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
@@ -62,11 +62,11 @@ class TeleopCore:
         hand_target_left = self.base_to_head_transform @ self.left_wrist_pose
         hand_target_right = self.base_to_head_transform @ self.right_wrist_pose
 
+        hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.2)
+        hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.2)
         rr.log('target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.1))
         rr.log('target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.1))
         # clamp hand targets z coordinate to be above -0.2
-        hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.2)
-        hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.2)
         joints = self.ik_solver.inverse_kinematics(np.array([hand_target_right, hand_target_left]))
         # Convert JAX array to NumPy for faster slicing operations
         joints = np.asarray(joints)
