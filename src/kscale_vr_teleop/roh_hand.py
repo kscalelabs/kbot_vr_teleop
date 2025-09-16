@@ -7,14 +7,6 @@ parser.add_argument('--canbus', type=int, default=0, help='CAN ID (default: 0)')
 parser.add_argument('--position', type=float, default=0, help='Position percentage 0-100')
 args = parser.parse_args()
 
-# Convert percentage to 0-65535 range
-position = int((args.position / 100) * 65535)
-
-bus = can.Bus(interface="socketcan", channel=f"can{args.canbus}", bitrate=1_000_000)
-
-
-bus.shutdown()
-
 class ROHHands:
     def __init__(self, left_canbus=0, right_canbus=1):
         self.left_bus = can.Bus(interface="socketcan", channel=f"can{left_canbus}", bitrate=1_000_000)
@@ -22,7 +14,8 @@ class ROHHands:
 
     def _set_hand_joints(self, bus: can.Bus, positions: np.ndarray):
         for finger, position in enumerate(positions):
-            data = bytes([finger, position & 0xFF, (position >> 8) & 0xFF, 255])
+            position_scaled = int((position / 100) * 65535)
+            data = bytes([finger, position_scaled & 0xFF, (position_scaled >> 8) & 0xFF, 255])
 
             HAND_ID = 0x02
             MASTER_ID = 0x01
@@ -52,3 +45,18 @@ class ROHHands:
 
     def set_right_hand_joints(self, positions: np.ndarray):
         self._set_hand_joints(self.right_bus, positions)
+
+
+    def __del__(self):
+        self.left_bus.shutdown()
+        self.right_bus.shutdown()
+
+if __name__ == "__main__":
+    # make sine waves and send to hand
+    roh = ROHHands(left_canbus=args.canbus, right_canbus=args.canbus)
+    while True:
+        time_ms = int(round(time.time() * 1000))
+        pos = (np.sin(time_ms / 1000) + 1) / 2 * 100
+        positions = np.array([pos, pos, pos, pos, pos])
+        roh.set_left_hand_joints(positions)
+        roh.set_right_hand_joints(positions)
