@@ -6,11 +6,12 @@ from kscale_vr_teleop.command_conn import Commander16
 from kscale_vr_teleop.udp_conn import UDPHandler
 import rerun as rr
 from line_profiler import profile
+import json
 
 class ControllerTeleopCore:
-    def __init__(self, udp_host='localhost', udp_port=10000):
+    def __init__(self, websocket, udp_host='localhost', udp_port=10000):
         self.head_matrix = np.eye(4, dtype=np.float32)
-        
+        self.websocket = websocket
         # Controller poses instead of finger poses
         self.right_controller_pose = np.eye(4, dtype=np.float32)
         self.left_controller_pose = np.eye(4, dtype=np.float32)
@@ -70,7 +71,7 @@ class ControllerTeleopCore:
         self.urdf_logger.log(new_config)
 
     @profile
-    def compute_joint_angles(self):
+    async def compute_joint_angles(self):
         '''
         Returns (right_arm_joints, left_arm_joints)
         '''
@@ -98,7 +99,9 @@ class ControllerTeleopCore:
         
         left_arm_joints = joints[5:]
         right_arm_joints = joints[:5]
-        
+        msg = json.dumps({"type": "joints", "right": right_arm_joints.tolist(), "left": left_arm_joints.tolist()})
+        print(msg)
+        await self.websocket.send(msg)
         # Convert controller trigger/grip values to gripper joint positions
         # 0.068 appears to be the maximum gripper opening
 

@@ -6,9 +6,11 @@ from kscale_vr_teleop.command_conn import Commander16
 from kscale_vr_teleop.udp_conn import UDPHandler
 import rerun as rr
 from line_profiler import profile
+import json
 
 class TeleopCore:
-    def __init__(self, udp_host='localhost', udp_port=10000):
+    def __init__(self, websocket, udp_host='localhost', udp_port=10000):
+        self.websocket = websocket
         self.head_matrix = np.eye(4, dtype=np.float32)
         self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
         self.left_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
@@ -83,7 +85,7 @@ class TeleopCore:
         # Log gripper positions as scalars for timeseries visualization
         rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
         rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
-
+        self.websocket.send(json.dumps({"type": "joints", "right": right_arm_joints.tolist() + [right_gripper_joint], "left": left_arm_joints.tolist() + [left_gripper_joint]}))
         return right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint]
     
     def send_kinfer_commands(self, right_arm: list, left_arm: list):

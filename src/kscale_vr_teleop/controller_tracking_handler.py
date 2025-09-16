@@ -43,13 +43,13 @@ else:
         print("Rerun visualization disabled - missing dependencies")
 
 class ControllerTrackingHandler:
-    def __init__(self, udp_host='10.42.0.1', udp_port=10000):
+    def __init__(self, websocket, udp_host='10.42.0.1', udp_port=10000):
         self.udp_host = udp_host
         self.udp_port = udp_port
 
-        self.teleop_core = ControllerTeleopCore(udp_host, udp_port)
+        self.teleop_core = ControllerTeleopCore(websocket, udp_host, udp_port)
 
-    def handle_tracking(self, event):
+    async def handle_tracking(self, event):
         """
         Handle controller tracking data.
         Expected format:
@@ -126,7 +126,7 @@ class ControllerTrackingHandler:
             self.teleop_core.update_right_controller(right_controller_pose, gripper_value)
 
         # Compute joint angles using the controller teleop core
-        right_arm_joints, left_arm_joints = self.teleop_core.compute_joint_angles()
+        right_arm_joints, left_arm_joints = await self.teleop_core.compute_joint_angles()
         self.teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
         self.teleop_core.send_kinfer_commands(right_arm_joints, left_arm_joints)
 

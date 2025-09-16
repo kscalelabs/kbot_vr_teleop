@@ -30,16 +30,6 @@ class RobotAppPair:
             logger.error(f"Failed to relay message from robot to app {self.robot_id}")
             self.app_ws = None
 
-    # async def relay_teleop_message(self, message: str):
-    #     """Relay message from app to robot"""
-    #     event = json.loads(message)
-    #     data = kinematics(event)
-    #     try:
-    #         await self.robot_ws.send(json.dumps(data))
-    #     except:
-    #         logger.error(f"Failed to relay message from app to robot {self.robot_id}")
-    #         self.robot_ws = None
-
     async def relay_app_message(self, message: str):
         """Relay message from app to robot"""
         try:
@@ -130,8 +120,7 @@ async def handle_teleop(websocket, robot_id: str):
             try:
                 # Parse the incoming message
                 data = json.loads(message)
-                print(message)
-                tracking_handler.handle_tracking(data)
+                await tracking_handler.handle_tracking(data)
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
                 
             except json.JSONDecodeError:
@@ -168,9 +157,9 @@ async def handler(websocket):
         #     await handle_app(websocket, robot_id, False)
         elif role == "teleop":
             if(control_type == "hand"):
-                tracking_handler = HandTrackingHandler()
+                tracking_handler = HandTrackingHandler(websocket)
             elif(control_type == "controller"):
-                tracking_handler = ControllerTrackingHandler()
+                tracking_handler = ControllerTrackingHandler(websocket)
             await handle_teleop(websocket, robot_id)
         else:
             websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
