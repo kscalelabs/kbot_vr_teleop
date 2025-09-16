@@ -15,6 +15,7 @@ dependencies = [
     "lxml>=6.0.1",
     "numpy>=2.2.6",
     "pillow>=11.3.0",
+    "python-can>=4.6.1",
     "pyyaml>=6.0.2",
     "rerun-sdk>=0.24.1",
     "scipy>=1.15.3",
