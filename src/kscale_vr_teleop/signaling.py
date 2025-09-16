@@ -7,7 +7,7 @@ import os
 import argparse
 from typing import Dict, Optional
 import logging
-from kscale_vr_teleop.hand_tracking_handler import HandTrackingHandler
+from kscale_vr_teleop.tracking_handler import HandTrackingHandler
 from kscale_vr_teleop.controller_tracking_handler import ControllerTrackingHandler
 
 logging.basicConfig(level=logging.INFO)
@@ -138,12 +138,7 @@ async def handle_teleop(websocket, robot_id: str):
                 # Parse the incoming message
                 data = json.loads(message)
                 # Process through appropriate tracking handler
-                if isinstance(tracking_handler, HandTrackingHandler):
-                    tracking_handler.handle_hand_tracking(data)
-                elif isinstance(tracking_handler, ControllerTrackingHandler):
-                    tracking_handler.handle_controller_tracking(data)
-                else:
-                    logger.error(f"Unknown tracking handler type: {type(tracking_handler)}")
+                tracking_handler.handle_hand_tracking(data)
 
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
                 
