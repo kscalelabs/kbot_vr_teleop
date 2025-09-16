@@ -7,6 +7,8 @@ from scipy.spatial.transform import Rotation
 from kscale_vr_teleop.util import fast_mat_inv
 from kscale_vr_teleop.teleop_core import TeleopCore
 
+from kscale_vr_teleop.finger_udp_server import FingerUDPHandler
+
 import rerun as rr
 os.environ["RERUN_EXECUTABLE"] = r"C:\Program Files\Rerun\rerun.exe"
 RERUN_AVAILABLE = True
@@ -52,6 +54,8 @@ class TrackingHandler:
         self.udp_port = udp_port
 
         self.teleop_core = TeleopCore(udp_host, udp_port)
+        self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
+
 
     def handle_hand_tracking(self,event):
         if event.get('left') != None:
@@ -125,7 +129,10 @@ class TrackingHandler:
                 finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
                 self.teleop_core.update_right_hand(wrist_mat, finger_poses)
 
-        right_arm_joints, left_arm_joints = self.teleop_core.compute_joint_angles()
+        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = self.teleop_core.compute_joint_angles()
         self.teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
 
         self.teleop_core.send_kinfer_commands(right_arm_joints, left_arm_joints)
+
+        # Send finger commands via new UDP server
+        self.finger_server.send_finger_commands(right_finger_angles, left_finger_angles)

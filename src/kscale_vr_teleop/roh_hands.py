@@ -51,6 +51,6 @@ if __name__ == "__main__":
     while True:
         time_ms = int(round(time.time() * 1000))
         pos = (np.sin(time_ms / 1000) + 1) / 2 * 100
-        positions = np.array([pos, pos, pos, pos, pos])
+        positions = np.array([pos, pos, pos, pos, pos, pos])
         roh.set_left_hand_joints(positions)
         roh.set_right_hand_joints(positions)

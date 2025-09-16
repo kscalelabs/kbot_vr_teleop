@@ -354,17 +354,6 @@ export default function Billboard({ stream, url, hands }: BillboardProps) {
 
         // Draw the curved billboard
         gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
-        // Render STL meshes using raw WebGL only if loaded
-        if (stlReady && stlGeometriesRef.current.left) {
-          const leftTransform = new THREE.Matrix4().makeTranslation(0, 1.5, -2);
-          renderSTLGeometry(gl, stlGeometriesRef.current.left, leftTransform);
-        }
-        if (stlReady && stlGeometriesRef.current.right) {
-          const rightTransform = new THREE.Matrix4().makeTranslation(0.5, 1.5, -2);
-          renderSTLGeometry(gl, stlGeometriesRef.current.right, rightTransform);
-        }
-        // Render a ring of red triangles for test
-        renderTestRing(gl);
       });
 
       session.requestAnimationFrame(onXRFrame);
