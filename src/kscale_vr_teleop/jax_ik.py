@@ -166,9 +166,9 @@ class RobotInverseKinematics:
             left_ee_up = left_ee_pose[:3, 1]
 
             gripper_offset_l = np.eye(4)
-            gripper_offset_l = gripper_offset_l.at[2,3].set(0.13)
+            gripper_offset_l = gripper_offset_l.at[2,3].set(0.21)
             gripper_offset_r = np.eye(4)
-            gripper_offset_r = gripper_offset_r.at[2,3].set(-0.13)
+            gripper_offset_r = gripper_offset_r.at[2,3].set(0.21)
 
             right_target_forward = -right_wrist_mat[:3, 2]
             left_target_forward = -left_wrist_mat[:3, 2]
