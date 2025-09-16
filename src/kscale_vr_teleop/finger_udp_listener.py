@@ -24,9 +24,6 @@ class FingerUDPListener:
         self._udp_sock.setblocking(False)
         self._udp_sock.bind((self.udp_host, self.udp_port))
 
-        # Increase receive buffer size to handle bursts
-        self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65536)  # 64KB
-
         # Initialize ROHHands for CAN communication
         self.roh_hands = ROHHands()
 
