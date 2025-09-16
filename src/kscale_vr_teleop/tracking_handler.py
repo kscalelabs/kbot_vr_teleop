@@ -66,8 +66,9 @@ class TrackingHandler:
                 
                 # Convert quaternion to rotation matrix
                 qx, qy, qz, qw = orientation
-                rotation_matrix = Rotation.from_quat([qx, qy, qz, qw], scalar_first=False).as_matrix()
-                
+                left_rotation = Rotation.from_euler('z', 90, degrees=True)
+                rotation_matrix = (Rotation.from_quat([qx, qy, qz, qw], scalar_first=False)*left_rotation).as_matrix()
+
                 # Create 4x4 transform matrix
                 left_controller_matrix = np.eye(4, dtype=np.float32)
                 left_controller_matrix[:3, :3] = rotation_matrix
@@ -101,7 +102,8 @@ class TrackingHandler:
                     return
                 # Convert quaternion to rotation matrix
                 qx, qy, qz, qw = orientation
-                rotation_matrix = Rotation.from_quat([qx, qy, qz, qw], scalar_first=False).as_matrix()
+                right_rotation = Rotation.from_euler('z', -90, degrees=True)
+                rotation_matrix = (Rotation.from_quat([qx, qy, qz, qw], scalar_first=False)*right_rotation).as_matrix()
                 
                 # Create 4x4 transform matrix
                 right_controller_matrix = np.eye(4, dtype=np.float32)
