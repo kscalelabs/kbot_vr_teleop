@@ -4,6 +4,7 @@ from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop.command_conn import Commander16
 from kscale_vr_teleop.udp_conn import UDPHandler
+from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
 import rerun as rr
 from line_profiler import profile
 
@@ -57,7 +58,9 @@ class TeleopCore:
     @profile
     def compute_joint_angles(self):
         '''
-        Returns (right_arm_joints, left_arm_joints)
+        Returns (right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles)
+        where right_arm_joints and left_arm_joints are lists of 6 floats (5 arm joints + gripper),
+        and right_finger_angles, left_finger_angles are np.ndarray of 6 floats (thumb_metacarpal + thumb + 4 fingers).
         '''
         hand_target_left = self.base_to_head_transform @ self.left_wrist_pose
         hand_target_right = self.base_to_head_transform @ self.right_wrist_pose
@@ -70,9 +73,6 @@ class TeleopCore:
         joints = self.ik_solver.inverse_kinematics(np.array([hand_target_right, hand_target_left]))
         # Convert JAX array to NumPy for faster slicing operations
         joints = np.asarray(joints)
-        # actual_positions = self.ik_solver.forward_kinematics(joints)
-        # rr.log('actual_right', rr.Transform3D(translation=actual_positions[0][:3, 3], mat3x3=actual_positions[0][:3, :3], axis_length=0.1))
-        # rr.log('actual_left', rr.Transform3D(translation=actual_positions[1][:3, 3], mat3x3=actual_positions[1][:3, :3], axis_length=0.1))
         left_arm_joints = joints[5:]
         right_arm_joints = joints[:5]
         right_finger_spacing = np.linalg.norm(self.right_finger_poses[8,:3,3] - self.right_finger_poses[3,:3,3])
@@ -80,20 +80,34 @@ class TeleopCore:
         left_finger_spacing = np.linalg.norm(self.left_finger_poses[8,:3,3] - self.left_finger_poses[3,:3,3])
         left_gripper_joint = 0.068*np.clip(left_finger_spacing/0.15, 0, 1)
 
+        # Compute finger joint angles (6 per hand: thumb_metacarpal + thumb + 4 fingers)
+        left_finger_angles, right_finger_angles = calculate_hand_joints_no_ik(self.left_finger_poses, self.right_finger_poses)
+        # Ensure finger angles are clipped to 0-1 (no trimming; keep all 6)
+        right_finger_angles = np.clip(right_finger_angles, 0, 1)
+        left_finger_angles = np.clip(left_finger_angles, 0, 1)
+
+        # Log finger angles for timeseries visualization
+        for i, finger in enumerate(['thumb_metacarpal', 'thumb', 'index', 'middle', 'ring', 'pinky']):
+            rr.log(f"plots/finger_angles/right/{finger}", rr.Scalars(right_finger_angles[i]))
+            rr.log(f"plots/finger_angles/left/{finger}", rr.Scalars(left_finger_angles[i]))
+
         # Log gripper positions as scalars for timeseries visualization
         rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
         rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
 
-        return right_arm_joints.tolist() + [right_gripper_joint], left_arm_joints.tolist() + [left_gripper_joint]
+        return (right_arm_joints.tolist() + [right_gripper_joint],
+                left_arm_joints.tolist() + [left_gripper_joint],
+                right_finger_angles,
+                left_finger_angles)
     
     def send_kinfer_commands(self, right_arm: list, left_arm: list):
         '''
-        Takes input in the same format as compute_joint_angles output
+        Takes input in the same format as compute_joint_angles arm output
         '''
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
     def send_kos_commands(self, right_arm: list, left_arm: list):
         '''
-        Takes input in the same format as compute_joint_angles output
+        Takes input in the same format as compute_joint_angles arm output
         '''
         self.kos_command_handler._send_udp(right_arm, left_arm)
