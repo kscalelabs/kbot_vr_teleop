@@ -156,29 +156,47 @@ class RobotInverseKinematics:
         @jax.jit
         def residuals(joint_angle_vector, transform_targets):
             end_effector_mats = self.forward_kinematics(joint_angle_vector)
-            right_ee_position = end_effector_mats[0]
-            left_ee_position = end_effector_mats[1]
+            right_ee_pose = end_effector_mats[0]
+            left_ee_pose = end_effector_mats[1]
             right_wrist_mat = transform_targets[0]
             left_wrist_mat = transform_targets[1]
-            right_ee_forward = right_ee_position[:3,2]
-            left_ee_forward = left_ee_position[:3,2]
+            right_ee_forward = right_ee_pose[:3,2]
+            left_ee_forward = left_ee_pose[:3,2]
+            right_ee_up = right_ee_pose[:3, 1]
+            left_ee_up = left_ee_pose[:3, 1]
+
+            gripper_offset_l = np.eye(4)
+            gripper_offset_l = gripper_offset_l.at[2,3].set(0.13)
+            gripper_offset_r = np.eye(4)
+            gripper_offset_r = gripper_offset_r.at[2,3].set(-0.13)
+
             right_target_forward = -right_wrist_mat[:3, 2]
             left_target_forward = -left_wrist_mat[:3, 2]
-            right_ee_up = right_ee_position[:3, 1]
-            left_ee_up = left_ee_position[:3, 1]
-            right_target_up = -right_wrist_mat[:3,0] # towards the thumb
-            left_target_up = left_wrist_mat[:3,0]
+            right_target_up = -right_wrist_mat[:3,1]
+            left_target_up = -left_wrist_mat[:3,1]
             
             arccos_approx = lambda x: np.pi/2 - x - x**3/6
             right_rotation_angle_off = arccos_approx(np.dot(right_ee_forward, right_target_forward))
             left_rotation_angle_off = arccos_approx(np.dot(left_ee_forward, left_target_forward))
             right_y_angle_off = arccos_approx(np.dot(right_ee_up, right_target_up))
             left_y_angle_off = arccos_approx(np.dot(left_ee_up, left_target_up))
+
+            right_ee_z_position = (right_ee_pose @ gripper_offset_r)[2, 3]
+            left_ee_z_position = (left_ee_pose @ gripper_offset_l)[2, 3]
+            z_min = -0.2
+
+            relu_approx = lambda x: x/2*(1+np.tanh(1e2*x))
+
+            penalties = np.array([
+                relu_approx(-(right_ee_z_position - z_min)),
+                relu_approx(-(left_ee_z_position - z_min))
+            ])
             
             return np.concatenate([
-                right_ee_position[:3, 3] - right_wrist_mat[:3, 3],
-                left_ee_position[:3, 3] - left_wrist_mat[:3, 3],
-                np.array([0.1*right_rotation_angle_off, 0.1*right_y_angle_off, 0.1*left_rotation_angle_off, 0.1*left_y_angle_off])
+                right_ee_pose[:3, 3] - right_wrist_mat[:3, 3],
+                left_ee_pose[:3, 3] - left_wrist_mat[:3, 3],
+                np.array([0.1*right_rotation_angle_off, 0.1*right_y_angle_off, 0.1*left_rotation_angle_off, 0.1*left_y_angle_off]),
+                100*penalties
             ])
         
         self.residuals = residuals
@@ -186,12 +204,14 @@ class RobotInverseKinematics:
         # check_grads(self.forward_kinematics, (self.last_solution,), order=2)
         
         # Setup Jacobian sparsity pattern
-        jac_sparsity_mat = np.zeros((10, len(self.active_joints)))
+        jac_sparsity_mat = np.zeros((12, len(self.active_joints))) # hard-coded b/c jac sparsity also is hard-coded
         # joints: evens are right, odds are left, order is shoulder to wrist
         jac_sparsity_mat = jac_sparsity_mat.at[:3, :8:2].set(1)
         jac_sparsity_mat = jac_sparsity_mat.at[6:8, ::2].set(1)
         jac_sparsity_mat = jac_sparsity_mat.at[3:6, 1:9:2].set(1)
         jac_sparsity_mat = jac_sparsity_mat.at[8:10, 1::2].set(1)
+
+        jac_sparsity_mat = jac_sparsity_mat.at[10:, :].set(1) # penalties depend on all joints
         
         # Create the solver once with sparsity pattern (without bounds for now)
         self.solver = jaxopt.ScipyBoundedLeastSquares(
@@ -203,7 +223,7 @@ class RobotInverseKinematics:
                 'xtol': 1e-3,
                 'gtol': 1e-3,
                 'ftol': 1e-3,
-            }
+            },
         )
 
     def inverse_kinematics(self, transform_targets: np.ndarray):
@@ -231,5 +251,5 @@ class RobotInverseKinematics:
 if __name__ == '__main__':
     urdf_path  = str(ASSETS_DIR / "kbot" / "robot.urdf")
     ik_solver = RobotInverseKinematics(urdf_path, ['KB_C_501X_Right_Bayonet_Adapter_Hard_Stop', 'KB_C_501X_Left_Bayonet_Adapter_Hard_Stop'], 'base')
-    for i in tqdm(range(1000)):
-        ik_solver.inverse_kinematics([np.eye(4), np.eye(4)])
+    # for i in tqdm(range(1000)):
+    #     ik_solver.inverse_kinematics([np.eye(4), np.eye(4)])
