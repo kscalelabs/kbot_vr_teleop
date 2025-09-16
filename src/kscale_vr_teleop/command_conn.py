@@ -46,12 +46,12 @@ class ControlVector16:
             "RShoulderRoll": self.RShoulderRoll,
             "RElbowPitch": self.RElbowPitch,
             "RElbowRoll": self.RElbowRoll,
-            "RWristPitch": self.RWristRoll,
+            "RWristRoll": self.RWristRoll,
             "LShoulderPitch": self.LShoulderPitch,
             "LShoulderRoll": self.LShoulderRoll,
             "LElbowPitch": self.LElbowPitch,
             "LElbowRoll": self.LElbowRoll,
-            "LWristPitch": self.LWristRoll,
+            "LWristRoll": self.LWristRoll,
         }
         return (json.dumps(payload) + "\n").encode("utf-8")
 
