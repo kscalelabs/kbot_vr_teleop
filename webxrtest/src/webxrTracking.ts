@@ -72,37 +72,72 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
 
 export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandSendRef) {
   const now = performance.now();
-  const sendInterval = 1000 / 30; // 30 Hz
+  const sendInterval = 1000 / 40; // 0 Hz
   const shouldSend = now - lastHandSendRef.current >= sendInterval;
   
   if (shouldSend) {
     lastHandSendRef.current = now;
   }
+  else{
+    return
+  }
+
   
   const controllerData = {};
   const controllerPositions = { left: null, right: null };
+
+  // Rotate a vector by a quaternion
+  const rotateVectorByQuaternion = (v, q) => {
+    const vx = v.x, vy = v.y, vz = v.z;
+    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+    const ix =  qw * vx + qy * vz - qz * vy;
+    const iy =  qw * vy + qz * vx - qx * vz;
+    const iz =  qw * vz + qx * vy - qy * vx;
+    const iw = -qx * vx - qy * vy - qz * vz;
+    return {
+      x: ix * qw + iw * -qx + iy * -qz - iz * -qy,
+      y: iy * qw + iw * -qy + iz * -qx - ix * -qz,
+      z: iz * qw + iw * -qz + ix * -qy - iy * -qx,
+    };
+  };
   
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
       const handedness = inputSource.handedness;
       const controllerPose = frame.getPose(inputSource.gripSpace, referenceSpace);
       if (controllerPose) {
-        // Extract controller position for STL rendering
+        // Offset position 0.5 units opposite controller forward direction
+        const pos = controllerPose.transform.position;
+        const ori = controllerPose.transform.orientation;
+        const forward = rotateVectorByQuaternion({ x: 0, y: 0, z: -1 }, ori);
+        const offset = 0.1;
+        const shifted = {
+          x: pos.x - forward.x * offset,
+          y: pos.y - forward.y * offset,
+          z: pos.z - forward.z * offset,
+        };
+
+        // Extract controller position for STL rendering (shifted)
         controllerPositions[handedness] = {
-          position: controllerPose.transform.position,
-          orientation: controllerPose.transform.orientation
+          position: shifted,
+          orientation: ori
         };
         
+        // const position = [
+        //   shifted.x,
+        //   shifted.y,
+        //   shifted.z
+        // ];
         const position = [
           controllerPose.transform.position.x,
           controllerPose.transform.position.y,
           controllerPose.transform.position.z
-        ];
+        ]
         const orientation = [
-          controllerPose.transform.orientation.x,
-          controllerPose.transform.orientation.y,
-          controllerPose.transform.orientation.z,
-          controllerPose.transform.orientation.w
+          ori.x,
+          ori.y,
+          ori.z,
+          ori.w
         ];
         const gamepad = inputSource.gamepad;
         let trigger = 0.0;

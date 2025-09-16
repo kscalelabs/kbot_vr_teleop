@@ -1,0 +1,13 @@
+{
+  "dof_left_shoulder_pitch_03": "LShoulderPitch",
+  "dof_left_shoulder_roll_03": "LShoulderRoll",
+  "dof_left_shoulder_yaw_02": "LElbowRoll",
+  "dof_left_elbow_02": "LElbowPitch",
+  "dof_left_wrist_00": "LWristPitch",
+
+  "dof_right_shoulder_pitch_03": "RShoulderPitch",
+  "dof_right_shoulder_roll_03": "RShoulderRoll",
+  "dof_right_shoulder_yaw_02": "RElbowRoll",
+  "dof_right_elbow_02": "RElbowPitch",
+  "dof_right_wrist_00": "RWristPitch"
+}

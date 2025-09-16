@@ -3,15 +3,17 @@ import VideoScreenWeb from './Video.tsx';
 import SideBySideVideo from './SideBySideVideo.tsx';
 import Billboard from './Billboard.tsx';
 import Sphere from './Sphere.tsx';
+import URDFViewer from './URDFViewer.tsx';
 
 function App() {
   const portString = window.location.port ? `:${window.location.port}` : '';
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
-  const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", "billboard", or "sphere"
+  const [viewMode, setViewMode] = useState("browser"); // "browser", "vr", "billboard", "sphere", or "urdf"
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
   const [hands, setHands] = useState(true);
+  const [sphereCoordinates, setSphereCoordinates] = useState({ x: 0, y: 0, z: -2 });
   
   const handleConnect = () => {
     setIsConnected(true);
@@ -185,6 +187,23 @@ function App() {
             >
               Sphere
             </button>
+            <button
+              onClick={() => setViewMode('urdf')}
+              disabled={isConnected}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                backgroundColor: viewMode === 'urdf' ? '#007bff' : '#333333',
+                color: viewMode === 'urdf' ? '#ffffff' : '#cccccc',
+                border: 'none',
+                cursor: isConnected ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: viewMode === 'urdf' ? 'bold' : 'normal',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              URDF
+            </button>
           </div>
         </div>
 
@@ -267,7 +286,40 @@ function App() {
 
         {isConnected && (
           <div style={{ padding: '10px', backgroundColor: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '4px', color: '#155724', textAlign: 'center' }}>
-            Connected in {viewMode === 'vr' ? 'VR' : viewMode === 'billboard' ? 'Billboard' : viewMode === 'sphere' ? 'Sphere' : 'Browser'} mode
+            Connected in {viewMode === 'vr' ? 'VR' : viewMode === 'billboard' ? 'Billboard' : viewMode === 'sphere' ? 'Sphere' : viewMode === 'urdf' ? 'URDF' : 'Browser'} mode
+          </div>
+        )}
+
+        {/* Sphere Coordinates Display */}
+        {isConnected && viewMode === 'urdf' && (
+          <div style={{ 
+            marginTop: '20px', 
+            padding: '15px', 
+            backgroundColor: '#1a1a1a', 
+            border: '2px solid #333', 
+            borderRadius: '8px', 
+            textAlign: 'center',
+            minWidth: '300px'
+          }}>
+            <h3 style={{ color: '#ffffff', margin: '0 0 10px 0', fontSize: '18px' }}>
+              Sphere Coordinates
+            </h3>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              fontSize: '16px',
+              color: '#ffffff'
+            }}>
+              <div>
+                <strong>X:</strong> {sphereCoordinates.x.toFixed(3)}
+              </div>
+              <div>
+                <strong>Y:</strong> {sphereCoordinates.y.toFixed(3)}
+              </div>
+              <div>
+                <strong>Z:</strong> {sphereCoordinates.z.toFixed(3)}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -299,6 +351,13 @@ function App() {
               stream1={streams[0] || null}
               stream2={streams[1] || null}
               url={url}
+            />
+          ) : viewMode === 'urdf' ? (
+            <URDFViewer
+              stream={streams[0] || null}
+              url={url}
+              hands={hands}
+              setSphereCoordinates={setSphereCoordinates}
             />
           ) : (
             <SideBySideVideo 
