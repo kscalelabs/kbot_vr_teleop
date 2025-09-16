@@ -123,16 +123,16 @@ export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandS
           orientation: ori
         };
         
-        // const position = [
-        //   shifted.x,
-        //   shifted.y,
-        //   shifted.z
-        // ];
         const position = [
-          controllerPose.transform.position.x,
-          controllerPose.transform.position.y,
-          controllerPose.transform.position.z
-        ]
+          shifted.x,
+          shifted.y,
+          shifted.z
+        ];
+        // const position = [
+        //   controllerPose.transform.position.x,
+        //   controllerPose.transform.position.y,
+        //   controllerPose.transform.position.z
+        // ]
         const orientation = [
           ori.x,
           ori.y,
