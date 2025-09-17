@@ -145,7 +145,6 @@ async def handler(websocket):
         logger.info(f"Initial message: {data}")
         role = data.get("role")
         robot_id = data.get("robot_id")
-        control_type = data.get("control_type", "hands")
         
         # if not robot_id:
         #     await websocket.send(json.dumps({"error": "robot_id required"}))
