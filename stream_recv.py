@@ -18,14 +18,6 @@ WS_HOST = "0.0.0.0"
 WS_PORT = 8013
 STUN_SERVER = "stun://stun.l.google.com:19302"
 
-# ---- GLib <-> asyncio pump ----
-async def glib_pump():
-    ctx = GLib.MainContext.default()
-    while True:
-        while ctx.pending():
-            ctx.iteration(False)
-        await asyncio.sleep(0.01)
-
 class OneRecvPeer:
     """
     One peer connection that only RECEIVES a single video track and displays it.
@@ -35,6 +27,14 @@ class OneRecvPeer:
         self.ws = send_ws
         self.pipe = None
         self.webrtc = None
+        asyncio.create_task(self.glib_pump())
+
+    async def glib_pump(self):
+        ctx = GLib.MainContext.default()
+        while True:
+            while ctx.pending():
+                ctx.iteration(False)
+            await asyncio.sleep(0.01)
 
     # --- GStreamer wiring ---
     def _on_decodebin_pad_added(self, decodebin, pad, convert):
@@ -182,7 +182,6 @@ async def handler(websocket):
 
 async def main():
     # Pump GLib so GStreamer keeps running in this asyncio app
-    asyncio.create_task(glib_pump())
 
     async with websockets.serve(handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
         print(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
