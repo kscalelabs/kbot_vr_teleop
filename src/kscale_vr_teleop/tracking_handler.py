@@ -49,11 +49,11 @@ else:
         print("Rerun visualization disabled - missing dependencies")
 
 class TrackingHandler:
-    def __init__(self, udp_host='10.33.13.146', udp_port=10000):
+    def __init__(self, websocket, udp_host='10.33.13.146', udp_port=10000):
         self.udp_host = udp_host
         self.udp_port = udp_port
 
-        self.teleop_core = TeleopCore(udp_host, udp_port)
+        self.teleop_core = TeleopCore(websocket, udp_host, udp_port)
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
 
 

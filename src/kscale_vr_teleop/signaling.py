@@ -12,7 +12,7 @@ from kscale_vr_teleop.tracking_handler import TrackingHandler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-tracking_handler = TrackingHandler()
+tracking_handler = None
 
 
 class RobotAppPair:
@@ -157,10 +157,7 @@ async def handler(websocket):
         # elif role == "app":
         #     await handle_app(websocket, robot_id, False)
         elif role == "teleop":
-            if(control_type == "hand"):
-                tracking_handler = HandTrackingHandler(websocket)
-            elif(control_type == "controller"):
-                tracking_handler = ControllerTrackingHandler(websocket)
+            tracking_handler = TrackingHandler(websocket)
             await handle_teleop(websocket, robot_id)
         else:
             websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
