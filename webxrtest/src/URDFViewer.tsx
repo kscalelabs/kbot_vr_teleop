@@ -25,11 +25,17 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
   const rightSphereRef = useRef<THREE.Mesh|null>(null);
   const videoPlaneMeshRef = useRef<THREE.Mesh|null>(null);
   const videoTextureRef = useRef<THREE.VideoTexture|null>(null);
+  const statusPlaneMeshRef = useRef<THREE.Mesh|null>(null);
+  const statusCanvasRef = useRef<HTMLCanvasElement|null>(null);
+  const statusTextureRef = useRef<THREE.CanvasTexture|null>(null);
+  const [videoPlaneReady, setVideoPlaneReady] = useState(false);
   const [ready, setReady] = useState(false);
   const robotRef = useRef<any>(null);
   const [wsMapData, setWsMapData] = useState<any>(null);
   const [mapData, setMapData] = useState<any>(null);
   const redSphereRef = useRef<THREE.Mesh|null>(null);
+  const pauseCommandsRef = useRef<boolean>(false);
+  const previousButtonStatesRef = useRef<Map<string, boolean>>(new Map());
   
   useEffect(() => {
     // Use the first available stream for the billboard
@@ -38,6 +44,111 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
       videoRef.current.play().catch(e => console.log(`Video play warning: ${e.message}`));
     }
   }, [stream]);
+
+  // Create status text canvas
+  const createStatusCanvas = (text: string) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Clear canvas with dark background
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    return canvas;
+  };
+
+  // Create video plane when stream and scene are ready
+  useEffect(() => {
+    if (threeSceneRef.current && !videoPlaneMeshRef.current) {
+      // Create video texture if stream is available
+      let videoTexture = null;
+      if (stream && videoRef.current) {
+        videoTexture = new THREE.VideoTexture(videoRef.current);
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
+        videoTextureRef.current = videoTexture;
+      }
+
+      // Create video plane geometry matching video aspect ratio (1280x1080)
+      const videoAspectRatio = 1280 / 1080; // 1.185
+      const height = 2.0;
+      const width = height * videoAspectRatio; // Maintain video aspect ratio
+      const segments = 32;
+      const planeGeometry = new THREE.PlaneGeometry(width, height, segments, segments);
+      
+      // Create material - use video texture if available, otherwise orange
+      const planeMaterial = new THREE.MeshBasicMaterial({ 
+        map: videoTexture || null,
+        color: videoTexture ? 0xffffff : 0xff8c00, // Orange if no video
+        side: THREE.DoubleSide
+      });
+
+      // Create mesh and position it directly in front of camera
+      const videoPlaneMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+      videoPlaneMesh.position.set(0, 0, -2); // Position in front of user
+      
+      videoPlaneMeshRef.current = videoPlaneMesh;
+      threeSceneRef.current.add(videoPlaneMesh);
+
+      // Create status plane beneath the video plane
+      if (!statusPlaneMeshRef.current) {
+        const videoAspectRatio = 1280 / 1080; // 1.185
+        const videoHeight = 2.0;
+        const videoWidth = videoHeight * videoAspectRatio;
+        
+        // Status plane: same width, 1/6th height
+        const statusHeight = videoHeight / 6;
+        const statusWidth = videoWidth;
+        const statusGeometry = new THREE.PlaneGeometry(statusWidth, statusHeight);
+        
+        // Create initial status canvas
+        const initialCanvas = createStatusCanvas('false');
+        if (initialCanvas) {
+          statusCanvasRef.current = initialCanvas;
+          const statusTexture = new THREE.CanvasTexture(initialCanvas);
+          statusTextureRef.current = statusTexture;
+          
+          const statusMaterial = new THREE.MeshBasicMaterial({ 
+            map: statusTexture,
+            side: THREE.DoubleSide
+          });
+          
+          const statusPlaneMesh = new THREE.Mesh(statusGeometry, statusMaterial);
+          
+          // Position beneath video plane and angle slightly up
+          statusPlaneMesh.position.set(0, -videoHeight/2 - statusHeight/2 - 0.1, -2);
+          statusPlaneMesh.rotation.x = -Math.PI / 12; // 15 degrees up (negative for upward angle)
+          
+          statusPlaneMeshRef.current = statusPlaneMesh;
+          threeSceneRef.current.add(statusPlaneMesh);
+        }
+      }
+      
+      setVideoPlaneReady(true);
+    }
+  }, [stream, threeSceneRef.current]);
+
+  // Update status text when pause state changes
+  useEffect(() => {
+    if (statusCanvasRef.current && statusTextureRef.current) {
+      const newCanvas = createStatusCanvas(pauseCommandsRef.current.toString());
+      if (newCanvas) {
+        statusCanvasRef.current = newCanvas;
+        statusTextureRef.current.image = newCanvas;
+        statusTextureRef.current.needsUpdate = true;
+      }
+    }
+  }, [pauseCommandsRef.current]);
 
   // Load joint mapping data
   useEffect(() => {
@@ -153,6 +264,44 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
     }
   };
 
+  // Handle controller input for pause toggle
+  const handleControllerInput = (frame: any, referenceSpace: any) => {
+    if (!frame || !referenceSpace) return;
+
+    const inputSources = frame.session.inputSources;
+    
+    for (const inputSource of inputSources) {
+      if (!inputSource.gamepad) continue;
+      
+      const gamepad = inputSource.gamepad;
+      const hand = inputSource.handedness; // 'left' or 'right'
+      
+      // Create unique key for this controller
+      const controllerKey = `${hand}-controller`;
+      
+      // Left controller X button (try multiple button indices as Quest mapping can vary)
+      if (hand === 'left' && gamepad.buttons) {
+        // Try button indices 2, 3, and 4 (X button location varies)
+        let buttonIndex = 4;
+        if (gamepad.buttons[2]) {
+          const currentPressed = gamepad.buttons[buttonIndex].pressed;
+          const stateKey = `${controllerKey}-${buttonIndex}`;
+          const previousPressed = previousButtonStatesRef.current.get(stateKey) || false;
+          
+          // Only trigger on button press (not hold)
+          if (currentPressed && !previousPressed) {
+            updateStatus('Commands Paused (Press X on left controller to resume)'+ buttonIndex +  !pauseCommandsRef.current);
+            pauseCommandsRef.current = !pauseCommandsRef.current;
+          }
+          
+          // Update previous state
+          previousButtonStatesRef.current.set(stateKey, currentPressed);
+        }
+        
+      }
+    }
+  };
+
   // Create spheres that mark the exact controller STL attach points
   const createControllerSpheres = () => {
     if (!threeSceneRef.current) return;
@@ -242,7 +391,6 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
       createControllerSpheres();
     }
   };
-
 
   // Process joint array (left or right) - convert indices to URDF joint names
   const processJointArray = (side: string, jointArray: number[]) => {
@@ -452,18 +600,29 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
         threeSceneRef.current.remove(redSphereRef.current);
         redSphereRef.current = null;
       }
+      if (videoPlaneMeshRef.current && threeSceneRef.current) {
+        threeSceneRef.current.remove(videoPlaneMeshRef.current);
+        videoPlaneMeshRef.current = null;
+      }
+      if (statusPlaneMeshRef.current && threeSceneRef.current) {
+        threeSceneRef.current.remove(statusPlaneMeshRef.current);
+        statusPlaneMeshRef.current = null;
+      }
     });
 
     // Use Three's XR render loop to obtain XRFrame
     renderer.setAnimationLoop((time, frame) => {
       if (!frame || !threeSceneRef.current) return;
       
+      // Handle controller input for pause toggle
+      handleControllerInput(frame, refSpace);
+      
       // Tracking → positions/orientations → STL mesh updates
       let handPositions = null;
       if (hands) {
         handPositions = handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
       } else {
-        handPositions = handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef);
+        handPositions = handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef, pauseCommandsRef.current);
       }
       if (handPositions) updateMeshPositions(handPositions);
 
@@ -547,7 +706,7 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
         <div style={{ 
           marginBottom: '20px', 
           padding: '10px', 
-          backgroundColor: '#f8f9fa', 
+          backgroundColor: 'red', 
           border: '1px solid #dee2e6', 
           borderRadius: '4px'
         }}>

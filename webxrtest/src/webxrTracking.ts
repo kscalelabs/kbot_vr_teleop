@@ -92,7 +92,7 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
   return handPositions;
 }
 
-export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandSendRef) {
+export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands) {
   const now = performance.now();
   const sendInterval = 1000 / 40; // 0 Hz
   const shouldSend = now - lastHandSendRef.current >= sendInterval;
@@ -114,7 +114,7 @@ export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandS
         // Offset position 0.5 units opposite controller forward direction
         const pos = controllerPose.transform.position;
         const ori = controllerPose.transform.orientation;
-        const position = shiftTargetWithOrientation(pos, ori, 0.08);
+        const position = shiftTargetWithOrientation(pos, ori, 0.1);
         
         const orientation = [
           ori.x,
@@ -144,7 +144,7 @@ export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandS
   }
   
   // Send WebSocket data only at specified interval
-  if (shouldSend && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(controllerData).length > 0) {
+  if (!pauseCommands && shouldSend && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(controllerData).length > 0) {
     try {
       wsRef.current.send(JSON.stringify(controllerData));
     } catch (error) {
