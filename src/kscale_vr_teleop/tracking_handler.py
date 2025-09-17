@@ -57,7 +57,7 @@ class TrackingHandler:
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
 
 
-    def handle_hand_tracking(self,event):
+    async def handle_hand_tracking(self,event):
         if event.get('left') != None:
             left_mat_raw = event['left']
             if isinstance(left_mat_raw, dict):
