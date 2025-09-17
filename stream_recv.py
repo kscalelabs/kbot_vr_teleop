@@ -2,6 +2,7 @@ import asyncio
 import json
 import websockets
 
+
 import gi
 gi.require_version("Gst", "1.0")
 gi.require_version("GstWebRTC", "1.0")
@@ -9,6 +10,9 @@ gi.require_version("GstSdp", "1.0")
 from gi.repository import Gst, GstWebRTC, GstSdp, GLib
 
 Gst.init(None)
+
+import numpy as np # If these run before Gst.init(), it segfaults
+import cv2
 
 WS_HOST = "0.0.0.0"
 WS_PORT = 8013
@@ -26,8 +30,8 @@ class OneRecvPeer:
     """
     One peer connection that only RECEIVES a single video track and displays it.
     """
-    def __init__(self, loop, send_ws):
-        self.loop = loop              # <-- keep a handle to the main asyncio loop
+    def __init__(self, send_ws):
+        self.loop = asyncio.get_running_loop()              # <-- keep a handle to the main asyncio loop
         self.ws = send_ws
         self.pipe = None
         self.webrtc = None
@@ -39,8 +43,6 @@ class OneRecvPeer:
             pad.link(sink)
 
     def _on_webrtc_pad_added(self, webrtc, pad):
-        import numpy as np
-        import cv2
         if pad.get_direction() != Gst.PadDirection.SRC:
             return
         queue = Gst.ElementFactory.make("queue")
@@ -152,8 +154,7 @@ class OneRecvPeer:
 # ---- WebSocket server ----
 async def handler(websocket):
     print("Client connected")
-    loop = asyncio.get_running_loop()    # <-- capture the running loop here
-    peer = OneRecvPeer(loop, websocket)
+    peer = OneRecvPeer(websocket)
     try:
         # Kick the client to start one camera
         await websocket.send(json.dumps({"type": "HELLO", "cameras": [0]}))
