@@ -39,28 +39,62 @@ class OneRecvPeer:
             pad.link(sink)
 
     def _on_webrtc_pad_added(self, webrtc, pad):
+        import numpy as np
+        import cv2
         if pad.get_direction() != Gst.PadDirection.SRC:
             return
         queue = Gst.ElementFactory.make("queue")
         decodebin = Gst.ElementFactory.make("decodebin")
         convert = Gst.ElementFactory.make("videoconvert")
-        sink = Gst.ElementFactory.make("autovideosink")
+        caps = Gst.Caps.from_string("video/x-raw,format=BGR")
+        appsink = Gst.ElementFactory.make("appsink")
+        appsink.set_property("emit-signals", True)
+        appsink.set_property("caps", caps)
+        appsink.set_property("sync", False)
 
-        self.pipe.add(queue); self.pipe.add(decodebin); self.pipe.add(convert); self.pipe.add(sink)
-        for e in (queue, decodebin, convert, sink):
+        self.pipe.add(queue); self.pipe.add(decodebin); self.pipe.add(convert); self.pipe.add(appsink)
+        for e in (queue, decodebin, convert, appsink):
             e.sync_state_with_parent()
 
         # webrtc:srcpad -> queue:sink
         q_sink = queue.get_static_pad("sink")
         pad.link(q_sink)
 
-        # queue -> decodebin (dynamic) -> convert -> sink
+        # queue -> decodebin (dynamic) -> convert -> appsink
         if not queue.link(decodebin):
             print("queue->decodebin link failed")
-        if not convert.link(sink):
-            print("videoconvert->sink link failed")
+        if not convert.link(appsink):
+            print("videoconvert->appsink link failed")
 
         decodebin.connect("pad-added", self._on_decodebin_pad_added, convert)
+
+        def on_new_sample(sink):
+            sample = sink.emit("pull-sample")
+            buf = sample.get_buffer()
+            caps = sample.get_caps()
+            arr = None
+            try:
+                # Get video info
+                structure = caps.get_structure(0)
+                width = structure.get_value('width')
+                height = structure.get_value('height')
+                # Extract buffer data
+                success, mapinfo = buf.map(Gst.MapFlags.READ)
+                if not success:
+                    return Gst.FlowReturn.ERROR
+                frame = np.frombuffer(mapinfo.data, dtype=np.uint8)
+                frame = frame.reshape((height, width, 3))
+                buf.unmap(mapinfo)
+                # Now frame is a BGR image (OpenCV format)
+                # Example: show with OpenCV (remove for headless)
+                cv2.imshow('WebRTC Stream', frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    cv2.destroyAllWindows()
+            except Exception as e:
+                print(f"Error in on_new_sample: {e}")
+            return Gst.FlowReturn.OK
+
+        appsink.connect("new-sample", on_new_sample)
 
     async def _send_json(self, obj):
         await self.ws.send(json.dumps(obj))
