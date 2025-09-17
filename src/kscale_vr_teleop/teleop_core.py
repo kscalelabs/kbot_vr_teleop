@@ -101,7 +101,7 @@ class TeleopCore:
         return right_gripper_joint, left_gripper_joint
 
     @profile
-    def compute_joint_angles(self):
+    async def compute_joint_angles(self):
         '''
         Returns (right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles)
         where right_arm_joints and left_arm_joints are lists of 6 floats (5 arm joints + gripper),
@@ -148,7 +148,9 @@ class TeleopCore:
         # Log gripper positions as scalars for timeseries visualization
         rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
         rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
-        self.websocket.send(json.dumps({"type": "joints", "right": right_arm_joints.tolist() + [right_gripper_joint], "left": left_arm_joints.tolist() + [left_gripper_joint]}))
+
+        msg = json.dumps({"type": "joints", "right": right_arm_joints.tolist(), "left": left_arm_joints.tolist()})
+        await self.websocket.send(msg)
 
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
