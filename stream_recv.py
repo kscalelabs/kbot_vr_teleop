@@ -1,7 +1,8 @@
 import asyncio
 import json
 import websockets
-
+import threading
+import time
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -23,12 +24,12 @@ class OneRecvPeer:
     One peer connection that only RECEIVES a single video track and displays it.
     """
     def __init__(self):
-        self.loop = asyncio.get_running_loop()              # <-- keep a handle to the main asyncio loop
         self.pipe = None
         self.webrtc = None
         self.latest_frame = None
         self.ws = None
-        asyncio.create_task(self.glib_pump())
+        self.thread = threading.Thread(target=self.async_loop_thread)
+        self.thread.start()
 
     async def glib_pump(self):
         ctx = GLib.MainContext.default()
@@ -182,22 +183,22 @@ class OneRecvPeer:
         finally:
             self.close()
 
-async def main():
-    # Pump GLib so GStreamer keeps running in this asyncio app
-    peer = OneRecvPeer()
-
-    async with websockets.serve(peer.handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
-        print(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
-        while True:
-            frame = peer.get_latest_frame()
-            if frame is not None:
-                cv2.imshow("Received Video", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-            await asyncio.sleep(1/30)
+    async def async_loop(self):
+        self.loop = asyncio.get_running_loop()              # <-- keep a handle to the main asyncio loop
+        asyncio.create_task(self.glib_pump())
+        async with websockets.serve(self.handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
+            print(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
+            await asyncio.Future() # run forever
+    
+    def async_loop_thread(self):
+        asyncio.run(self.async_loop())
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    peer = OneRecvPeer()
+    while True:
+        frame = peer.get_latest_frame()
+        if frame is not None:
+            cv2.imshow("Received Video", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        time.sleep(1/30)
