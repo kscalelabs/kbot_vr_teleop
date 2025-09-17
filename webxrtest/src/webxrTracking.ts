@@ -44,6 +44,36 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
     "pinky-finger-metacarpal", "pinky-finger-phalanx-proximal", "pinky-finger-phalanx-intermediate",
     "pinky-finger-phalanx-distal", "pinky-finger-tip"
   ];
+
+  // Extract hand data
+  const viewerPose = frame.getViewerPose?.(referenceSpace);
+  if (viewerPose) {
+    const t = viewerPose.transform || viewerPose.views?.[0]?.transform;
+    if (t) {
+      const q = t.orientation; // {x,y,z,w}
+      // forward = q * (0,0,-1) * q^-1
+      const vx = 0, vy = 0, vz = -1;
+      const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
+      const ix =  qw * vx + qy * vz - qz * vy;
+      const iy =  qw * vy + qz * vx - qx * vz;
+      const iz =  qw * vz + qx * vy - qy * vx;
+      const iw = -qx * vx - qy * vy - qz * vz;
+      const fx = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+      const fy = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+      const fz = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+
+      const RAD2DEG = 180 / Math.PI;
+      const yawDeg   = Math.atan2(fx, -fz) * RAD2DEG;                 // around +Y
+      const pitchDeg = Math.atan2(fy, Math.hypot(fx, fz)) * RAD2DEG;  // around +X
+
+      handData['head'] = {
+        pitch: pitchDeg,
+        yaw: yawDeg,
+        head_matrix: Array.from(t.matrix)
+      };
+    }
+  }
+  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.hand) {
       const handedness = inputSource.handedness;
