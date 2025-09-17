@@ -81,9 +81,9 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
 
       // Create video plane geometry matching video aspect ratio (1280x1080)
       const videoAspectRatio = 1280 / 1080; // 1.185
-      const height = 2.0;
+      const height = 3.0;
       const width = height * videoAspectRatio; // Maintain video aspect ratio
-      const segments = 32;
+      const segments = 256;
       const planeGeometry = new THREE.PlaneGeometry(width, height, segments, segments);
       
       // Create material - use video texture if available, otherwise orange
