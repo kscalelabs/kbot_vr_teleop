@@ -33,7 +33,7 @@ def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
         right_finger_angles = np.array([thumb_angle] + other_angles.tolist())
         # Add thumb metacarpal angle (from wrist-relative thumb base rotation)
         thumb_metacarpal_angle = Rotation.from_matrix(right_fingers_mat[0,:3,:3]).as_euler('XYZ', degrees=False)[1]
-        right_finger_angles = np.insert(right_finger_angles, 0, thumb_metacarpal_angle)  
+        right_finger_angles = np.insert(right_finger_angles, 5, 1-thumb_metacarpal_angle)  
         right_finger_angles = np.clip(1 - right_finger_angles, 0, 1)  # Invert
     except ValueError as e:
         warnings.warn(f"ValueError in right hand computation: {e}")
@@ -53,7 +53,7 @@ def calculate_hand_joints_no_ik(left_fingers_mat, right_fingers_mat):
         left_finger_angles = np.array([thumb_angle] + other_angles.tolist())
         # Add thumb metacarpal (from left thumb base rotation)
         thumb_metacarpal_angle = Rotation.from_matrix(left_fingers_mat[0,:3,:3]).as_euler('XYZ', degrees=False)[1]
-        left_finger_angles = np.insert(left_finger_angles, 0, thumb_metacarpal_angle)  # Prepend metacarpal
+        left_finger_angles = np.insert(left_finger_angles, 5, 1-thumb_metacarpal_angle)  # Prepend metacarpal
         left_finger_angles = np.clip(1 - left_finger_angles, 0, 1)  # Invert
     except ValueError as e:
         warnings.warn(f"ValueError in left hand computation: {e}")

@@ -130,8 +130,10 @@ class TeleopCore:
         else:
             left_finger_angles = np.zeros(6, dtype=np.float32)
             right_finger_angles = np.zeros(6, dtype=np.float32)
-            left_finger_angles[2] = self.left_gripper_value
-            right_finger_angles[2] = self.right_gripper_value
+            left_finger_angles[-1] = 1
+            right_finger_angles[-1] = 1
+            left_finger_angles[:-1] = self.left_gripper_value
+            right_finger_angles[:-1] = self.right_gripper_value
         # Ensure finger angles are clipped to 0-1 (no trimming; keep all 6)
         right_finger_angles = np.clip(right_finger_angles, 0, 1)
         left_finger_angles = np.clip(left_finger_angles, 0, 1)

@@ -19,13 +19,12 @@ class FingerUDPHandler:
         # Increase send buffer size to handle bursts
         self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # 64KB
 
-        # Set socket priority 
+        # Set socket priority (if supported)
         try:
             self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)  # High priority
         except:
-            pass  
-
-        # Enable broadcast
+            pass  # Not all systems support this
+        # Enable broadcast (useful for some network setups)
         self._udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
     def send_finger_commands(self, right_fingers, left_fingers):
@@ -49,4 +48,4 @@ class FingerUDPHandler:
         try:
             self._udp_sock.sendto(json.dumps(payload).encode("utf-8"), (self.udp_host, self.udp_port))
         except Exception:
-            pass 
+            print("Failed to send udp packet")
