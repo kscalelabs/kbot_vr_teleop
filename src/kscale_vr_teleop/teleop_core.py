@@ -141,7 +141,7 @@ class TeleopCore:
         left_finger_angles = np.clip(left_finger_angles, 0, 1)
 
         # Log finger angles for timeseries visualization
-        for i, finger in enumerate(['thumb_metacarpal', 'thumb', 'index', 'middle', 'ring', 'pinky']):
+        for i, finger in enumerate(['thumb', 'index', 'middle', 'ring', 'pinky', 'thumb_yaw']):
             rr.log(f"plots/finger_angles/right/{finger}", rr.Scalars(right_finger_angles[i]))
             rr.log(f"plots/finger_angles/left/{finger}", rr.Scalars(left_finger_angles[i]))
 
