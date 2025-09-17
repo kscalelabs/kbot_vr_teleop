@@ -157,6 +157,7 @@ async def handler(websocket):
         #     await handle_app(websocket, robot_id, False)
         elif role == "teleop":
             tracking_handler = TrackingHandler(websocket, udp_host=os.environ.get("ROBOT_IP", "10.33.13.254"))
+            await tracking_handler.init_livekit(identity="vr_sender")
             await handle_teleop(websocket, robot_id)
         else:
             websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
