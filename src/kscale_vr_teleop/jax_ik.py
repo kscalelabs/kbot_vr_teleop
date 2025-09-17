@@ -46,13 +46,6 @@ class RobotInverseKinematics:
             upper_bounds.append(self.urdf.joint_map[joint].limit.upper)
             lower_bounds.append(self.urdf.joint_map[joint].limit.lower)
 
-        # for joint in self.urdf.joints:
-        #     if joint.joint_type == 'revolute':
-        #         upper_bounds.append(joint.limit.upper)
-        #         lower_bounds.append(joint.limit.lower)
-            # else:
-            #     upper_bounds.append(np.inf)
-            #     lower_bounds.append(-np.inf)
         self.upper_bounds = np.array(upper_bounds)
         self.lower_bounds = np.array(lower_bounds)
         self.last_solution = np.zeros(len(self.active_joints))

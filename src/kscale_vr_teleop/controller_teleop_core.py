@@ -100,7 +100,6 @@ class ControllerTeleopCore:
         left_arm_joints = joints[5:]
         right_arm_joints = joints[:5]
         msg = json.dumps({"type": "joints", "right": right_arm_joints.tolist(), "left": left_arm_joints.tolist()})
-        print(msg)
         await self.websocket.send(msg)
         # Convert controller trigger/grip values to gripper joint positions
         # 0.068 appears to be the maximum gripper opening

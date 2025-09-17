@@ -13,7 +13,6 @@ function App() {
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
   const [hands, setHands] = useState(true);
-  const [sphereCoordinates, setSphereCoordinates] = useState({ x: 0, y: 0, z: -2 });
   
   const handleConnect = () => {
     setIsConnected(true);
@@ -290,38 +289,6 @@ function App() {
           </div>
         )}
 
-        {/* Sphere Coordinates Display */}
-        {isConnected && viewMode === 'urdf' && (
-          <div style={{ 
-            marginTop: '20px', 
-            padding: '15px', 
-            backgroundColor: '#1a1a1a', 
-            border: '2px solid #333', 
-            borderRadius: '8px', 
-            textAlign: 'center',
-            minWidth: '300px'
-          }}>
-            <h3 style={{ color: '#ffffff', margin: '0 0 10px 0', fontSize: '18px' }}>
-              Sphere Coordinates
-            </h3>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              fontSize: '16px',
-              color: '#ffffff'
-            }}>
-              <div>
-                <strong>X:</strong> {sphereCoordinates.x.toFixed(3)}
-              </div>
-              <div>
-                <strong>Y:</strong> {sphereCoordinates.y.toFixed(3)}
-              </div>
-              <div>
-                <strong>Z:</strong> {sphereCoordinates.z.toFixed(3)}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {isConnected && (
@@ -357,7 +324,6 @@ function App() {
               stream={streams[0] || null}
               url={url}
               hands={hands}
-              setSphereCoordinates={setSphereCoordinates}
             />
           ) : (
             <SideBySideVideo 

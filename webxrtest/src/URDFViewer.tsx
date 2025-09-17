@@ -8,10 +8,9 @@ interface URDFViewerProps {
   stream: MediaStream | null;
   url: string;
   hands: boolean;
-  setSphereCoordinates: (coords: { x: number; y: number; z: number }) => void;
 }
 
-export default function URDFViewer({ stream, url, hands, setSphereCoordinates }: URDFViewerProps) {
+export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastHandSendRef = useRef<number>(0);
@@ -84,7 +83,6 @@ export default function URDFViewer({ stream, url, hands, setSphereCoordinates }:
         const maxDimension = Math.max(size.x, size.y, size.z);
         
         // Scale to make the largest dimension about 0.1 units (adjustable)
-        const targetSize = ``;
         const scale = 1
         
         // Apply scale and flip on all axes
@@ -155,23 +153,6 @@ export default function URDFViewer({ stream, url, hands, setSphereCoordinates }:
     }
   };
 
-  // Create red sphere for joystick control
-  const createRedSphere = () => {
-    if (threeSceneRef.current && !redSphereRef.current) {
-      const sphereGeometry = new THREE.SphereGeometry(0.025, 16, 16); // Half radius (0.025)
-      const sphereMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-      
-      const redSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-      redSphere.position.set(0, 0, -2); // Start in front of robot
-      
-      redSphereRef.current = redSphere;
-      threeSceneRef.current.add(redSphere);
-      
-      // Set initial coordinates
-      setSphereCoordinates({ x: 0, y: 0, z: -2 });
-    }
-  };
-
   // Create spheres that mark the exact controller STL attach points
   const createControllerSpheres = () => {
     if (!threeSceneRef.current) return;
@@ -227,9 +208,6 @@ export default function URDFViewer({ stream, url, hands, setSphereCoordinates }:
           
           threeSceneRef.current.add(robot);
           
-          // Create red sphere for joystick control
-          createRedSphere();
-          
           setReady(true);
         },
         (progress) => {
@@ -237,26 +215,10 @@ export default function URDFViewer({ stream, url, hands, setSphereCoordinates }:
         },
         (error) => {
           console.error('Error loading URDF:', error);
-          // Create fallback cube if URDF fails
-          createFallbackCube();
         }
       );
     }
   };
-
-  // Fallback cube if URDF loading fails
-  const createFallbackCube = () => {
-    if (threeSceneRef.current) {
-      const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-      const cubeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-      const fallbackCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-      
-      fallbackCube.position.set(0, 0, -2);
-      threeSceneRef.current.add(fallbackCube);
-      setReady(true);
-    }
-  };
-
 
   // Initialize Three.js scene
   const initThreeScene = () => {
@@ -326,13 +288,15 @@ export default function URDFViewer({ stream, url, hands, setSphereCoordinates }:
     
     // Update left hand mesh
     if (handPositions.left && leftHandMeshRef.current) {
-      const { position, orientation } = handPositions.left;
-      leftHandMeshRef.current.position.set(position.x, position.y, position.z);
-      leftHandMeshRef.current.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+      const position = handPositions.left.position;
+      const orientation = handPositions.left.orientation;
+ 
+      leftHandMeshRef.current.position.set(position[0], position[1], position[2]);
+      leftHandMeshRef.current.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
       leftHandMeshRef.current.visible = true;
       if (leftSphereRef.current) {
-        leftSphereRef.current.position.set(position.x, position.y, position.z);
-        leftSphereRef.current.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+        leftSphereRef.current.position.set(position[0], position[1], position[2]);
+        leftSphereRef.current.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
         leftSphereRef.current.visible = true;
       }
     } else if (leftHandMeshRef.current) {
@@ -342,13 +306,14 @@ export default function URDFViewer({ stream, url, hands, setSphereCoordinates }:
 
     // Update right hand mesh
     if (handPositions.right && rightHandMeshRef.current) {
-      const { position, orientation } = handPositions.right;
-      rightHandMeshRef.current.position.set(position.x, position.y, position.z);
-      rightHandMeshRef.current.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+      const position = handPositions.right.position;
+      const orientation = handPositions.right.orientation;
+      rightHandMeshRef.current.position.set(position[0], position[1], position[2]);
+      rightHandMeshRef.current.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
       rightHandMeshRef.current.visible = true;
       if (rightSphereRef.current) {
-        rightSphereRef.current.position.set(position.x, position.y, position.z);
-        rightSphereRef.current.quaternion.set(orientation.x, orientation.y, orientation.z, orientation.w);
+        rightSphereRef.current.position.set(position[0], position[1], position[2]);
+        rightSphereRef.current.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
         rightSphereRef.current.visible = true;
       }
     } else if (rightHandMeshRef.current) {
