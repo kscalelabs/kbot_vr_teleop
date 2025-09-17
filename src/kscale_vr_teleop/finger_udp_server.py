@@ -4,11 +4,11 @@ import time
 import numpy as np
 
 class FingerUDPHandler:
-    def __init__(self, udp_host='10.33.13.254', udp_port=10001):
+    def __init__(self, udp_host, udp_port=10001):
         """
         Initialize UDP handler for sending finger joint angles to robot.
         Args:
-            udp_host (str): Robot IP address (default: 10.33.13.254).
+            udp_host (str): Robot IP address
             udp_port (int): UDP port for finger commands (default: 10001).
         """
         self.udp_host = udp_host
