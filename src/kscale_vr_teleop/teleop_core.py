@@ -9,7 +9,7 @@ from line_profiler import profile
 import json
 
 class TeleopCore:
-    def __init__(self, websocket, udp_host='localhost', udp_port=10000):
+    def __init__(self, websocket, udp_host='10.33.13.143', udp_port=10000):
         self.websocket = websocket
         self.head_matrix = np.eye(4, dtype=np.float32)
         self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
