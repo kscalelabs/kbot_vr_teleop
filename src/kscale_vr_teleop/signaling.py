@@ -2,18 +2,17 @@ import asyncio
 import json
 import websockets
 import socket
+import time
 import os
 import argparse
 from typing import Dict, Optional
 import logging
-from kscale_vr_teleop.hand_tracking_handler import HandTrackingHandler
-from kscale_vr_teleop.controller_tracking_handler import ControllerTrackingHandler
+from kscale_vr_teleop.tracking_handler import TrackingHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global tracking handler - will be set based on mode
-tracking_handler = None
+tracking_handler = TrackingHandler()
 
 
 class RobotAppPair:
@@ -120,7 +119,9 @@ async def handle_teleop(websocket, robot_id: str):
             try:
                 # Parse the incoming message
                 data = json.loads(message)
-                await tracking_handler.handle_tracking(data)
+                # Process through appropriate tracking handler
+                await tracking_handler.handle_hand_tracking(data)
+
                 logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
                 
             except json.JSONDecodeError:
@@ -172,9 +173,10 @@ async def handler(websocket):
     #     logger.error(f"Error in handler: {e}")
 
 async def main():
+    
     server = await websockets.serve(handler, "0.0.0.0", 8013, ping_interval=10,   # send a ping every 20s
     ping_timeout=300 )
-    logger.info(f"Robot-App signaling server running on ws://0.0.0.0:8013 with tracking")
+    logger.info(f"Robot-App signaling server running on ws://0.0.0.0:8013")
     
     try:
         await server.wait_closed()
