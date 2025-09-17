@@ -22,11 +22,12 @@ class OneRecvPeer:
     """
     One peer connection that only RECEIVES a single video track and displays it.
     """
-    def __init__(self, send_ws):
+    def __init__(self):
         self.loop = asyncio.get_running_loop()              # <-- keep a handle to the main asyncio loop
-        self.ws = send_ws
         self.pipe = None
         self.webrtc = None
+        self.latest_frame = None
+        self.ws = None
         asyncio.create_task(self.glib_pump())
 
     async def glib_pump(self):
@@ -89,9 +90,7 @@ class OneRecvPeer:
                 buf.unmap(mapinfo)
                 # Now frame is a BGR image (OpenCV format)
                 # Example: show with OpenCV (remove for headless)
-                cv2.imshow('WebRTC Stream', frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    cv2.destroyAllWindows()
+                self.latest_frame = frame
             except Exception as e:
                 print(f"Error in on_new_sample: {e}")
             return Gst.FlowReturn.OK
@@ -99,7 +98,8 @@ class OneRecvPeer:
         appsink.connect("new-sample", on_new_sample)
 
     async def _send_json(self, obj):
-        await self.ws.send(json.dumps(obj))
+        if self.ws:
+            await self.ws.send(json.dumps(obj))
 
     def _send_json_threadsafe(self, obj):
         # Schedule the coroutine on the captured asyncio loop from any GI/GStreamer thread
@@ -144,6 +144,9 @@ class OneRecvPeer:
 
     def add_remote_ice(self, mlineindex: int, candidate: str):
         self.webrtc.emit("add-ice-candidate", int(mlineindex), candidate)
+    
+    def get_latest_frame(self):
+        return self.latest_frame
 
     def close(self):
         if self.pipe:
@@ -151,41 +154,47 @@ class OneRecvPeer:
         self.pipe = None
         self.webrtc = None
 
-# ---- WebSocket server ----
-async def handler(websocket):
-    print("Client connected")
-    peer = OneRecvPeer(websocket)
-    try:
-        # Kick the client to start one camera
-        await websocket.send(json.dumps({"type": "HELLO", "cameras": [0]}))
+    async def handler(self, websocket):
+        self.ws = websocket
+        print("Client connected")
+        try:
+            # Kick the client to start one camera
+            await websocket.send(json.dumps({"type": "HELLO", "cameras": [0]}))
 
-        # Build our receive-only pipeline
-        peer.build_pipeline()
+            # Build our receive-only pipeline
+            self.build_pipeline()
 
-        async for msg in websocket:
-            data = json.loads(msg)
+            async for msg in websocket:
+                data = json.loads(msg)
 
-            # ignore initial role message
-            if "role" in data:
-                print("Role:", data["role"])
-                continue
+                # ignore initial role message
+                if "role" in data:
+                    print("Role:", data["role"])
+                    continue
 
-            if "sdp" in data and data["sdp"]["type"] == "offer":
-                await peer.handle_offer(data["sdp"]["sdp"])
-            elif "ice" in data:
-                ice = data["ice"]
-                peer.add_remote_ice(ice["sdpMLineIndex"], ice["candidate"])
-    except websockets.exceptions.ConnectionClosed:
-        print("Client disconnected")
-    finally:
-        peer.close()
+                if "sdp" in data and data["sdp"]["type"] == "offer":
+                    await self.handle_offer(data["sdp"]["sdp"])
+                elif "ice" in data:
+                    ice = data["ice"]
+                    self.add_remote_ice(ice["sdpMLineIndex"], ice["candidate"])
+        except websockets.exceptions.ConnectionClosed:
+            print("Client disconnected")
+        finally:
+            self.close()
 
 async def main():
     # Pump GLib so GStreamer keeps running in this asyncio app
+    peer = OneRecvPeer()
 
-    async with websockets.serve(handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
+    async with websockets.serve(peer.handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
         print(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
-        await asyncio.Future()  # run forever
+        while True:
+            frame = peer.get_latest_frame()
+            if frame is not None:
+                cv2.imshow("Received Video", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            await asyncio.sleep(1/30)
 
 if __name__ == "__main__":
     try:
