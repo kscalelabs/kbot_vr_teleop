@@ -31,7 +31,7 @@ class TeleopCore:
         self.ik_solver = RobotInverseKinematics(self.urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
         self.base_to_head_transform = np.eye(4)
-        # self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
+        self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
 
         self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
         self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
