@@ -10,6 +10,10 @@ from kscale_vr_teleop.teleop_core import TeleopCore
 from kscale_vr_teleop.finger_udp_server import FingerUDPHandler
 
 import rerun as rr
+from dotenv import load_dotenv
+from livekit import rtc, api as lk
+import asyncio
+
 os.environ["RERUN_EXECUTABLE"] = r"C:\Program Files\Rerun\rerun.exe"
 RERUN_AVAILABLE = True
 
@@ -56,8 +60,77 @@ class TrackingHandler:
         self.teleop_core = TeleopCore(websocket, udp_host, udp_port)
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
 
+   # Setup livekit connection
+        load_dotenv('env.env')
 
+        self.LIVEKIT_API_KEY: str = os.getenv("LIVEKIT_API_KEY")
+        self.LIVEKIT_API_SECRET: str = os.getenv("LIVEKIT_API_SECRET")
+        self.LIVEKIT_URL: str = os.getenv("LIVEKIT_URL")
+        self.LIVEKIT_ROOM_NAME: str = os.getenv('ROOM_NAME', 'pan-tilt-controls')
+        # get token
+    
+        missing = [k for k, v in {
+                "LIVEKIT_API_KEY": self.LIVEKIT_API_KEY,
+                "LIVEKIT_API_SECRET": self.LIVEKIT_API_SECRET,
+                "LIVEKIT_URL": self.LIVEKIT_URL
+            }.items() if not v]
+        if missing:
+            raise RuntimeError(f"Missing env: {', '.join(missing)}")
+
+        self.teleop_core = TeleopCore(websocket, udp_host, udp_port)
+        self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
+
+        self.room: rtc.Room | None = None
+
+        
+    async def init_livekit(self, identity: str="vr_sender"):
+        """Connect once; call after creating handler"""
+        if self.room is not None:
+            return
+        
+        # Build token with new API
+        token = (
+            lk.AccessToken(self.LIVEKIT_API_KEY, self.LIVEKIT_API_SECRET)
+            .with_identity(identity)
+            .with_grants(
+                lk.VideoGrants(
+                    room_join=True,
+                    room=self.LIVEKIT_ROOM_NAME,
+                    can_publish_data=True,
+                    can_subscribe=True,
+                )
+            )
+            .to_jwt()
+        )
+
+        # Connect RTC
+        self.room = rtc.Room()
+
+        @self.room.on("connected")
+        def _on_connected():
+            print(f"[LiveKit] connected as {identity} to room '{self.LIVEKIT_ROOM_NAME}' at {self.LIVEKIT_URL}")
+
+        @self.room.on("disconnected")
+        def _on_disconnected():
+            print("[LiveKit] disconnected")
+
+        @self.room.on("connection_state_changed")
+        def _on_state(state):
+            print(f"[LiveKit] state -> {state}")
+
+        await self.room.connect(self.LIVEKIT_URL, token)
+    async def send_livekit_data(self, data, reliable=True):
+        if not self.room:
+            raise RuntimeError("LiveKit room not connected; call await init_livekit() first")
+        
+        await self.room.local_participant.publish_data(
+                json.dumps(data).encode("utf-8"),
+                reliable=reliable,
+            )
+        
     async def handle_hand_tracking(self,event):
+        print(event.keys())
+
         if event.get('left') != None:
             left_mat_raw = event['left']
             if isinstance(left_mat_raw, dict):
@@ -128,6 +201,30 @@ class TrackingHandler:
                 wrist_mat = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
                 finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
                 self.teleop_core.update_right_hand(wrist_mat, finger_poses)
+
+
+
+        # Head
+        if event.get('head') != None:
+            head = event['head']
+            pitch = float(head["pitch"])
+            yaw = float(head["yaw"])
+            matrix = np.array(head['head_matrix'], dtype=np.float32).reshape(4,4).T
+            print("Head pitch, yaw:", pitch, yaw)
+            print("Head matrix:", matrix)
+
+            # Fire-and-forget publish (since this method isn't async)
+            if pitch is not None and yaw is not None:
+                async def _send():
+                    try:
+                        await self.send_livekit_data(
+                            {"command": "set", "pitch": pitch, "yaw": yaw},
+                            reliable=False
+                        )
+                    except Exception as e:
+                        print(f"LiveKit send error: {e}")
+
+                asyncio.create_task(_send())
 
         right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = await self.teleop_core.compute_joint_angles()
         self.teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
