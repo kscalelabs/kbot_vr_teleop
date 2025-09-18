@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { handleHandTracking, handleControllerTracking } from './webxrTracking';
+import { handleTracking } from './webxrTracking';
 
 const flipCenter = (centerX: number, centerY: number, width: number, height: number) => {
   return [centerX, centerY];
@@ -264,9 +264,9 @@ export default function Billboard({ stream1, stream2, url }: BillboardProps) {
   
     const onXRFrame = (time: DOMHighResTimeStamp, frame: XRFrame) => {
       // Example: send hand tracking data if WebSocket is open
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
-      }
+      // if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      //   handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
+      // }
       const pose = frame.getViewerPose(refSpace);
       if (!pose) {
         session.requestAnimationFrame(onXRFrame);

@@ -1,5 +1,7 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
+import { sceneState } from './sceneHandling';
+
 export type localTargetLocation = {
   left: {
     position: number[];
@@ -40,7 +42,7 @@ function shiftTargetWithOrientation(pos, ori, offset) {
   ]
 }
 
-export function handleHandTracking(frame, referenceSpace): trackingResult {  
+function handleHandTracking(frame, referenceSpace): trackingResult {  
   const handData = {};
   const handPositions: localTargetLocation = { left: null, right: null };
   const JOINT_ORDER = [
@@ -105,7 +107,7 @@ export function handleHandTracking(frame, referenceSpace): trackingResult {
   return { handPositions: handPositions, payload: handData };
 }
 
-export function handleControllerTracking(frame, referenceSpace): trackingResult {  
+function handleControllerTracking(frame, referenceSpace): trackingResult {  
   const controllerData: localTargetLocation = { left: null, right: null };  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
@@ -172,3 +174,40 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
   }
   return respone.handPositions;
 }
+
+// Handle controller input for pause toggle
+export const handleControllerInput = (frame: any, referenceSpace: any, sceneState: sceneState) => {
+  if (!frame || !referenceSpace) return;
+
+  const inputSources = frame.session.inputSources;
+
+  for (const inputSource of inputSources) {
+    if (!inputSource.gamepad) continue;
+
+    const gamepad = inputSource.gamepad;
+    const hand = inputSource.handedness; // 'left' or 'right'
+
+    // Create unique key for this controller
+    const controllerKey = `${hand}-controller`;
+
+    // Left controller X button (try multiple button indices as Quest mapping can vary)
+    if (hand === 'left' && gamepad.buttons) {
+      // Try button indices 2, 3, and 4 (X button location varies)
+      let buttonIndex = 4;
+      if (gamepad.buttons[2]) {
+        const currentPressed = gamepad.buttons[buttonIndex].pressed;
+        const stateKey = `${controllerKey}-${buttonIndex}`;
+        const previousPressed = sceneState.previousButtonStates.get(stateKey) || false;
+
+        // Only trigger on button press (not hold)
+        if (currentPressed && !previousPressed) {
+          sceneState.pauseCommands = !sceneState.pauseCommands;
+        }
+
+        // Update previous state
+        sceneState.previousButtonStates.set(stateKey, currentPressed);
+      }
+
+    }
+  }
+};

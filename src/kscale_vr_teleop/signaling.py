@@ -145,7 +145,7 @@ async def handler(websocket):
         logger.info(f"Initial message: {data}")
         role = data.get("role")
         robot_id = data.get("robot_id")
-        
+        udp_host = data.get("udp_host")
         # if not robot_id:
         #     await websocket.send(json.dumps({"error": "robot_id required"}))
             # return
@@ -155,8 +155,9 @@ async def handler(websocket):
             await handle_app(websocket, robot_id)
         # elif role == "app":
         #     await handle_app(websocket, robot_id, False)
+        # udp_host=os.environ.get("ROBOT_IP", "10.33.13.254")
         elif role == "teleop":
-            tracking_handler = TrackingHandler(websocket, udp_host=os.environ.get("ROBOT_IP", "10.33.13.254"))
+            tracking_handler = TrackingHandler(websocket, udp_host=udp_host)
             await handle_teleop(websocket, robot_id)
         else:
             websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
