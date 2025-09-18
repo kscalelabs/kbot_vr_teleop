@@ -4,7 +4,7 @@ import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { handleTracking, handleControllerInput, type localTargetLocation } from './webxrTracking';
 import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, updateSTLPositions, 
-  createStatusCanvas, createVideoPlane, updateVideoTexture, loadSTLModels, loadURDFRobot, actuatorMapping } from './sceneHandling';
+  createStatusCanvas, createVideoPlane, updateVideoTexture, loadSTLModelsWithFallback, loadURDFRobot, actuatorMapping } from './sceneHandling';
 
 interface VRViewerProps {
   stream: MediaStream | null;
@@ -207,7 +207,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     await createVideoPlane(sceneStateRef.current, stream, videoRef);
     setLoadCount(2);
     updateStatus('Loading STL Models');
-    await loadSTLModels(sceneStateRef.current);
+    await loadSTLModelsWithFallback(sceneStateRef.current);
     setLoadCount(3);
     updateStatus('Loading Robot URDF');
     await loadURDFRobot(sceneStateRef.current, updateStatus);
