@@ -64,7 +64,7 @@ class WebRTCClient:
             src = Gst.ElementFactory.make("libcamerasrc", f"libcamerasrc{i}")
             src.set_property("camera-name", cam_name)
             print("camera-name", src.get_property("camera-name"))
-            caps = Gst.Caps.from_string("video/x-raw,format=YUY2, framerate=30/1")
+            caps = Gst.Caps.from_string("video/x-raw,format=YUY2, framerate=30/1, width=1920, height=1080")
             capsfilter = Gst.ElementFactory.make("capsfilter", f"caps{i}")
             capsfilter.set_property("caps", caps)
             conv = Gst.ElementFactory.make("videoconvert", f"conv{i}")
