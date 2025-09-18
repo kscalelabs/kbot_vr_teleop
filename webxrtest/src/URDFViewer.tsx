@@ -4,7 +4,7 @@ import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { handleTracking, handleControllerInput, type localTargetLocation } from './webxrTracking';
 import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, updateSTLPositions, 
-  createStatusCanvas, createVideoPlane, loadSTLModels, loadURDFRobot, actuatorMapping } from './sceneHandling';
+  createStatusCanvas, createVideoPlane, updateVideoTexture, loadSTLModels, loadURDFRobot, actuatorMapping } from './sceneHandling';
 
 interface VRViewerProps {
   stream: MediaStream | null;
@@ -19,6 +19,10 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   const [status, setStatus] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const [loadCount, setLoadCount] = useState(0);
+  
+  // Track last color updates to prevent flickering
+  const lastLeftColorRef = useRef<number>(-1);
+  const lastRightColorRef = useRef<number>(-1);
 
   const xrSessionRef = useRef<XRSession | null>(null);
 
@@ -30,6 +34,11 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
       videoRef.current.play().catch(e => console.log(`Video play warning: ${e.message}`));
+      
+      // Update video texture if plane already exists
+      if (sceneStateRef.current.videoPlaneMesh) {
+        updateVideoTexture(sceneStateRef.current, stream, videoRef);
+      }
     }
   }, [stream]);
 
@@ -109,8 +118,8 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
 
   // Function to get color based on distance (green to red spectrum for both hands)
   const getDistanceColor = (distance: number): number => {
-    // Clamp distance between 0 and 0.5 for color interpolation
-    const clampedDistance = Math.min(Math.max(distance, 0), 0.5);
+    // Clamp distance between 0 and 0.2 for color interpolation
+    const clampedDistance = Math.min(Math.max(distance, 0), 0.2);
     
     // Scale distance to 0-1 range for interpolation
     const scaledDistance = clampedDistance / 0.2;
@@ -123,9 +132,12 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   };
 
   // Function to update STL mesh color based on distance
-  const updateMeshColor = (mesh: THREE.Mesh | null, color: number, handSide: string) => {
+  const updateMeshColor = (mesh: THREE.Mesh | null, color: number, handSide: string, lastColorRef: React.MutableRefObject<number>) => {
     if (mesh && mesh.material instanceof THREE.MeshLambertMaterial) {
-      mesh.material.color.setHex(color);
+      if (lastColorRef.current !== color) {
+        mesh.material.color.setHex(color);
+        lastColorRef.current = color;
+      }
     }
   };
 
@@ -298,14 +310,14 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
               if (data.distances.left !== undefined && sceneStateRef.current.leftHandMesh) {
                 const leftDistance = data.distances.left;
                 const leftColor = getDistanceColor(leftDistance);
-                updateMeshColor(sceneStateRef.current.leftHandMesh, leftColor, 'LEFT');
+                updateMeshColor(sceneStateRef.current.leftHandMesh, leftColor, 'LEFT', lastLeftColorRef);
               }
               
               // Update right hand mesh color based on its own distance (green to red spectrum)
               if (data.distances.right !== undefined && sceneStateRef.current.rightHandMesh) {
                 const rightDistance = data.distances.right;
                 const rightColor = getDistanceColor(rightDistance);
-                updateMeshColor(sceneStateRef.current.rightHandMesh, rightColor, 'RIGHT');
+                updateMeshColor(sceneStateRef.current.rightHandMesh, rightColor, 'RIGHT', lastRightColorRef);
               }
             }
           }

@@ -29,8 +29,6 @@ export type sceneState = {
     renderer: THREE.WebGLRenderer | null;
     leftHandMesh: THREE.Mesh | null;
     rightHandMesh: THREE.Mesh | null;
-    leftSphere: THREE.Mesh | null;
-    rightSphere: THREE.Mesh | null;
     videoPlaneMesh: THREE.Mesh | null;
     videoTexture: THREE.VideoTexture | null;
     statusPlaneMesh: THREE.Mesh | null;
@@ -46,8 +44,6 @@ export type sceneState = {
     renderer: null,
     leftHandMesh: null,
     rightHandMesh: null,
-    leftSphere: null,
-    rightSphere: null,
     videoPlaneMesh: null,
     videoTexture: null,
     statusPlaneMesh: null,
@@ -64,8 +60,6 @@ export type sceneState = {
         const meshesToClean = [
           sceneState.leftHandMesh,
           sceneState.rightHandMesh,
-          sceneState.leftSphere,
-          sceneState.rightSphere,
           sceneState.videoPlaneMesh,
           sceneState.statusPlaneMesh,
           sceneState.robot
@@ -179,12 +173,6 @@ export type sceneState = {
           // Create left and right hand meshes with separate materials
           const leftMesh = new THREE.Mesh(geometry, leftMaterial);
           const rightMesh = new THREE.Mesh(geometry, rightMaterial);
-
-          // Calculate appropriate scale based on STL bounding box
-          geometry.computeBoundingBox();
-          const boundingBox = geometry.boundingBox!;
-          const size = boundingBox.max.clone().sub(boundingBox.min);
-          const maxDimension = Math.max(size.x, size.y, size.z);
 
           // Scale to make the largest dimension about 0.1 units (adjustable)
           const scale = 1
@@ -300,68 +288,117 @@ export type sceneState = {
         // Create video texture if stream is available
         let videoTexture = null;
         if (stream && videoRef.current) {
-          videoTexture = new THREE.VideoTexture(videoRef.current);
-          videoTexture.minFilter = THREE.LinearFilter;
-          videoTexture.magFilter = THREE.LinearFilter;
-          sceneState.videoTexture = videoTexture;
+          // Wait for video to be ready before creating texture
+          const setupVideoTexture = () => {
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+              videoTexture = new THREE.VideoTexture(videoRef.current);
+              videoTexture.minFilter = THREE.LinearFilter;
+              videoTexture.magFilter = THREE.LinearFilter;
+              sceneState.videoTexture = videoTexture;
+              createPlaneWithTexture();
+            } else {
+              // Wait for video to be ready
+              setTimeout(setupVideoTexture, 100);
+            }
+          };
+          
+          const createPlaneWithTexture = () => {
+            createVideoPlaneMesh(videoTexture);
+            resolve(true);
+          };
+          
+          setupVideoTexture();
+          return;
+        } else {
+          // No stream, create plane with orange fallback
+          createVideoPlaneMesh(null);
+          resolve(true);
+          return;
         }
+        
+        function createVideoPlaneMesh(videoTexture: THREE.VideoTexture | null) {
+          // Create video plane geometry matching video aspect ratio (1280x1080)
+          const videoAspectRatio = 1280 / 1080; // 1.185
+          const height = 3.0;
+          const width = height * videoAspectRatio; // Maintain video aspect ratio
+          const segments = 256;
+          const planeGeometry = new THREE.PlaneGeometry(width, height, segments, segments);
 
-        // Create video plane geometry matching video aspect ratio (1280x1080)
-        const videoAspectRatio = 1280 / 1080; // 1.185
-        const height = 3.0;
-        const width = height * videoAspectRatio; // Maintain video aspect ratio
-        const segments = 256;
-        const planeGeometry = new THREE.PlaneGeometry(width, height, segments, segments);
-
-        // Create material - use video texture if available, otherwise orange
-        const planeMaterial = new THREE.MeshBasicMaterial({
-          map: videoTexture || null,
-          color: videoTexture ? 0xffffff : 0xff8c00, // Orange if no video
-          side: THREE.DoubleSide
-        });
-
-        // Create mesh and position it directly in front of camera
-        const videoPlaneMesh = new THREE.Mesh(planeGeometry, planeMaterial);
-        videoPlaneMesh.position.set(0, 0, -2); // Position in front of user
-
-        sceneState.videoPlaneMesh = videoPlaneMesh;
-        sceneState.scene.add(videoPlaneMesh);
-
-        // Create status plane beneath the video plane
-        const videoHeight = 2.0;
-        const videoWidth = videoHeight * videoAspectRatio;
-
-        // Status plane: same width, 1/6th height
-        const statusHeight = videoHeight / 6;
-        const statusWidth = videoWidth;
-        const statusGeometry = new THREE.PlaneGeometry(statusWidth, statusHeight);
-
-        // Create initial status canvas
-        const initialCanvas = createStatusCanvas('false');
-        if (initialCanvas) {
-          sceneState.statusCanvas = initialCanvas;
-          const statusTexture = new THREE.CanvasTexture(initialCanvas);
-          sceneState.statusTexture = statusTexture;
-
-          const statusMaterial = new THREE.MeshBasicMaterial({
-            map: statusTexture,
+          // Create material - use video texture if available, otherwise orange
+          const planeMaterial = new THREE.MeshBasicMaterial({
+            map: videoTexture || null,
+            color: videoTexture ? 0xffffff : 0xff8c00, // Orange if no video
             side: THREE.DoubleSide
           });
 
-          const statusPlaneMesh = new THREE.Mesh(statusGeometry, statusMaterial);
+          // Create mesh and position it directly in front of camera
+          const videoPlaneMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+          videoPlaneMesh.position.set(0, 0, -2); // Position in front of user
 
-          // Position beneath video plane and angle slightly up
-          statusPlaneMesh.position.set(0, -videoHeight / 2 - statusHeight / 2 - 0.1, -2);
-          statusPlaneMesh.rotation.x = -Math.PI / 12; // 15 degrees up (negative for upward angle)
+          sceneState.videoPlaneMesh = videoPlaneMesh;
+          sceneState.scene.add(videoPlaneMesh);
 
-          sceneState.statusPlaneMesh = statusPlaneMesh;
-          sceneState.scene.add(statusPlaneMesh);
+          // Create status plane beneath the video plane
+          const videoHeight = 2.0;
+          const videoWidth = videoHeight * videoAspectRatio;
+
+          // Status plane: same width, 1/6th height
+          const statusHeight = videoHeight / 6;
+          const statusWidth = videoWidth;
+          const statusGeometry = new THREE.PlaneGeometry(statusWidth, statusHeight);
+
+          // Create initial status canvas
+          const initialCanvas = createStatusCanvas('false');
+          if (initialCanvas) {
+            sceneState.statusCanvas = initialCanvas;
+            const statusTexture = new THREE.CanvasTexture(initialCanvas);
+            sceneState.statusTexture = statusTexture;
+
+            const statusMaterial = new THREE.MeshBasicMaterial({
+              map: statusTexture,
+              side: THREE.DoubleSide
+            });
+
+            const statusPlaneMesh = new THREE.Mesh(statusGeometry, statusMaterial);
+
+            // Position beneath video plane and angle slightly up
+            statusPlaneMesh.position.set(0, -videoHeight / 2 - statusHeight / 2 - 0.1, -2);
+            statusPlaneMesh.rotation.x = -Math.PI / 12; // 15 degrees up (negative for upward angle)
+
+            sceneState.statusPlaneMesh = statusPlaneMesh;
+            sceneState.scene.add(statusPlaneMesh);
+          }
         }
-
-        resolve(true);
       }
       else {
         reject(new Error('no scene ref for createVideoPlane'));
       }
     });
+  };
+
+  // Update video texture when stream becomes available
+  export const updateVideoTexture = (sceneState: sceneState, stream: MediaStream | null, videoRef: React.RefObject<HTMLVideoElement>) => {
+    if (stream && videoRef.current && sceneState.videoPlaneMesh && sceneState.videoPlaneMesh.material instanceof THREE.MeshBasicMaterial) {
+      // Wait for video to be ready
+      const setupVideoTexture = () => {
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          const videoTexture = new THREE.VideoTexture(videoRef.current);
+          videoTexture.minFilter = THREE.LinearFilter;
+          videoTexture.magFilter = THREE.LinearFilter;
+          
+          sceneState.videoTexture = videoTexture;
+          const material = sceneState.videoPlaneMesh!.material as THREE.MeshBasicMaterial;
+          material.map = videoTexture;
+          material.color.setHex(0xffffff); // White when video is available
+          material.needsUpdate = true;
+          
+          console.log('Video texture updated successfully');
+        } else {
+          // Wait for video to be ready
+          setTimeout(setupVideoTexture, 100);
+        }
+      };
+      
+      setupVideoTexture();
+    }
   };
