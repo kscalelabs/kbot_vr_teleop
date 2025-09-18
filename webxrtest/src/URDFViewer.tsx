@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { handleTracking, handleControllerInput, type localTargetLocation } from './webxrTracking';
-import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, updateMeshPositions, createStatusCanvas, createVideoPlane, loadSTLModels, loadURDFRobot } from './sceneHandling';
+import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, updateMeshPositions, 
+  createStatusCanvas, createVideoPlane, loadSTLModels, loadURDFRobot, actuatorMapping } from './sceneHandling';
 
 interface VRViewerProps {
   stream: MediaStream | null;
@@ -18,8 +19,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   const [status, setStatus] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const [loadCount, setLoadCount] = useState(0);
-  const mapDataRef = useRef<any>(null);
-  const wsMapDataRef = useRef<any>(null);
+
   const xrSessionRef = useRef<XRSession | null>(null);
 
   // Single state object for all scene-related refs
@@ -83,29 +83,6 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     }
   }
 
-  // Load joint mapping data
-  const loadMappingData = async () => {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const wsMapResponse = await fetch('/wsmap.json');
-        const wsMap = await wsMapResponse.json();
-        wsMapDataRef.current = wsMap;
-
-        const mapResponse = await fetch('/map.json');
-        const map = await mapResponse.json();
-        mapDataRef.current = map;
-        resolve(true);
-      } catch (error) {
-        console.error('Error loading mapping data:', error);
-        reject(error);
-      }
-    })
-  };
-
-  // Load STL models when component mounts
-
-  // Handle controller input for pause toggle
-
 
   // Initialize Three.js scene
   const initThreeScene = async () => {
@@ -131,7 +108,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   };
 
   const processJointArray = (side: string, jointArray: number[]) => {
-    if (!wsMapDataRef.current || !wsMapDataRef.current[side]) {
+    if (!actuatorMapping[side]) {
       console.error(`No mapping found for side: ${side}`);
       return;
     }
@@ -144,7 +121,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     const jointUpdates: { [key: string]: number } = {};
 
     jointArray.forEach((angleInRadians, index) => {
-      const jointName = wsMapDataRef.current[side][index.toString()];
+      const jointName = actuatorMapping[side][index.toString()];
       if (jointName && sceneStateRef.current.robot?.joints[jointName]) {
         // Store update for batch processing
         jointUpdates[jointName] = angleInRadians;
@@ -201,12 +178,9 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     updateStatus('Loading Robot URDF');
     await loadURDFRobot(sceneStateRef.current, updateStatus);
     setLoadCount(4);
-    updateStatus('Loading Actuator Mapping');
-    await loadMappingData();
-    setLoadCount(5);
     updateStatus('Setting up Tracking WebSocket');
     await setupTrackingWebSocket()
-    setLoadCount(6);
+    setLoadCount(5);
     updateStatus('Requesting VR Session');
 
     // Request the XR session with appropriate features
@@ -217,12 +191,12 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
       });
       xrSessionRef.current = session;
       // Hand the session to Three (this sets up XRWebGLLayer, etc.)
-      setLoadCount(7);
+      setLoadCount(6);
       await renderer.xr.setSession(session);
       updateStatus('XR Session Running ');
     }
     catch (err) {
-      setLoadCount(7);
+      setLoadCount(6);
       updateStatus('XR Session Running ');
       return
     }
@@ -385,7 +359,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
       {loadCount < 7 && (
         <div style={{
           marginBottom: '20px',
-          backgroundImage: `url(${createWebLoadingWheel(loadCount / 7)})`,
+          backgroundImage: `url(${createWebLoadingWheel(loadCount / 6)})`,
           backgroundSize: 'contain',
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center',

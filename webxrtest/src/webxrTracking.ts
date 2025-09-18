@@ -14,6 +14,7 @@ export type localTargetLocation = {
 };
 
 export type trackingResult = {
+  type: "hand" | "controller";
   handPositions: localTargetLocation;
   payload: any;
 }
@@ -104,7 +105,7 @@ function handleHandTracking(frame, referenceSpace): trackingResult {
     }
   }
 
-  return { handPositions: handPositions, payload: handData };
+  return { type: "hand", handPositions: handPositions, payload: handData };
 }
 
 function handleControllerTracking(frame, referenceSpace): trackingResult {  
@@ -146,10 +147,10 @@ function handleControllerTracking(frame, referenceSpace): trackingResult {
     }
   }
 
-  return { handPositions: controllerData, payload: controllerData };
+  return { type: "controller", handPositions: controllerData, payload: controllerData };
 }
 
-export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands): localTargetLocation | null {
+export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands): trackingResult | null {
   const now = performance.now();
   const sendInterval = 1000 / 40; // 0 Hz
   const shouldSend = now - lastHandSendRef.current >= sendInterval;
@@ -172,7 +173,7 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
       console.log(`Failed to send controller tracking data: ${error}`);
     }
   }
-  return respone.handPositions;
+  return respone;
 }
 
 // Handle controller input for pause toggle

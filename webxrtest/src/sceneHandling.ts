@@ -2,7 +2,28 @@ import * as THREE from 'three';
 import React from 'react';
 import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { type trackingResult } from './webxrTracking';
 
+// Fixed local Z-axis offset for STL models (-90 degrees)
+const STL_Z_OFFSET = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+
+export const actuatorMapping = {
+    "left": {
+      "0": "dof_left_shoulder_pitch_03",
+      "1": "dof_left_shoulder_roll_03",
+      "2": "dof_left_shoulder_yaw_02",
+      "3": "dof_left_elbow_02",
+      "4": "dof_left_wrist_00"
+    },
+    "right": {
+      "0": "dof_right_shoulder_pitch_03",
+      "1": "dof_right_shoulder_roll_03",
+      "2": "dof_right_shoulder_yaw_02",
+      "3": "dof_right_elbow_02",
+      "4": "dof_right_wrist_00"
+    }
+  }
+  
 export type sceneState = {
     scene: THREE.Scene | null;
     renderer: THREE.WebGLRenderer | null;
@@ -85,9 +106,10 @@ export type sceneState = {
       }
 
   // Update STL mesh positions based on hand tracking
-  export const updateMeshPositions = (sceneState: sceneState, handPositions: any) => {
+  export const updateMeshPositions = (sceneState: sceneState, trackingResult: trackingResult) => {
     if (!sceneState.scene) return;
-    
+    const handPositions = trackingResult.handPositions;
+    const type = trackingResult.type;
     // Add meshes to scene if they exist but aren't added yet
     if (sceneState.leftHandMesh && !sceneState.scene.children.includes(sceneState.leftHandMesh)) {
       sceneState.scene.add(sceneState.leftHandMesh);
@@ -103,6 +125,10 @@ export type sceneState = {
 
       sceneState.leftHandMesh.position.set(position[0], position[1], position[2]);
       sceneState.leftHandMesh.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
+      // Apply persistent 90° rotation about the mesh's own Z axis
+      if(type == "controller"){
+        sceneState.leftHandMesh.quaternion.multiply(STL_Z_OFFSET);
+      }
       sceneState.leftHandMesh.visible = true;
       if (sceneState.leftSphere) {
         sceneState.leftSphere.position.set(position[0], position[1], position[2]);
@@ -120,6 +146,10 @@ export type sceneState = {
       const orientation = handPositions.right.orientation;
       sceneState.rightHandMesh.position.set(position[0], position[1], position[2]);
       sceneState.rightHandMesh.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
+      // Apply persistent 90° rotation about the mesh's own Z axis
+      if(type == "controller"){
+        sceneState.rightHandMesh.quaternion.multiply(STL_Z_OFFSET);
+      }
       sceneState.rightHandMesh.visible = true;
       if (sceneState.rightSphere) {
         sceneState.rightSphere.position.set(position[0], position[1], position[2]);
