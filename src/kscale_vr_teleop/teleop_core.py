@@ -110,8 +110,8 @@ class TeleopCore:
         hand_target_left = self.base_to_head_transform @ self.left_wrist_pose
         hand_target_right = self.base_to_head_transform @ self.right_wrist_pose
 
-        hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.2)
-        hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.2)
+        hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.3)
+        hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.3)
         rr.log('target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.1))
         rr.log('target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.1))
         # clamp hand targets z coordinate to be above -0.2

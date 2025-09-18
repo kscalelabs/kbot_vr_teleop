@@ -176,7 +176,7 @@ class RobotInverseKinematics:
 
             right_ee_z_position = (right_ee_pose @ gripper_offset_r)[2, 3]
             left_ee_z_position = (left_ee_pose @ gripper_offset_l)[2, 3]
-            z_min = -0.2
+            z_min = -0.3
 
             relu_approx = lambda x: x/2*(1+np.tanh(1e2*x))
 
