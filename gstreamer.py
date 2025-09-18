@@ -15,7 +15,8 @@ Gst.init(None)
 
 # WebSocket configuration
 # HOST_URL= "wss://c47174bc6ce1.ngrok-free.app"
-HOST_URL= "ws://10.33.13.51:8013"
+ip = os.environ.get("HOST_IP", "10.33.13.51")
+HOST_URL= f"ws://{ip}:8013"
 PIPELINE_DESC = '''
 webrtcbin name=sendrecv bundle-policy=max-bundle stun-server=stun://stun.l.google.com:19302
 '''

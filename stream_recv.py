@@ -1,6 +1,8 @@
 import asyncio
 import json
 import websockets
+import threading
+import time
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -10,27 +12,31 @@ from gi.repository import Gst, GstWebRTC, GstSdp, GLib
 
 Gst.init(None)
 
+import numpy as np # If these run before Gst.init(), it segfaults
+import cv2
+
 WS_HOST = "0.0.0.0"
 WS_PORT = 8013
 STUN_SERVER = "stun://stun.l.google.com:19302"
-
-# ---- GLib <-> asyncio pump ----
-async def glib_pump():
-    ctx = GLib.MainContext.default()
-    while True:
-        while ctx.pending():
-            ctx.iteration(False)
-        await asyncio.sleep(0.01)
 
 class OneRecvPeer:
     """
     One peer connection that only RECEIVES a single video track and displays it.
     """
-    def __init__(self, loop, send_ws):
-        self.loop = loop              # <-- keep a handle to the main asyncio loop
-        self.ws = send_ws
+    def __init__(self):
         self.pipe = None
         self.webrtc = None
+        self.latest_frame = None
+        self.ws = None
+        self.thread = threading.Thread(target=self.async_loop_thread)
+        self.thread.start()
+
+    async def glib_pump(self):
+        ctx = GLib.MainContext.default()
+        while True:
+            while ctx.pending():
+                ctx.iteration(False)
+            await asyncio.sleep(0.01)
 
     # --- GStreamer wiring ---
     def _on_decodebin_pad_added(self, decodebin, pad, convert):
@@ -44,26 +50,57 @@ class OneRecvPeer:
         queue = Gst.ElementFactory.make("queue")
         decodebin = Gst.ElementFactory.make("decodebin")
         convert = Gst.ElementFactory.make("videoconvert")
-        sink = Gst.ElementFactory.make("autovideosink")
+        caps = Gst.Caps.from_string("video/x-raw,format=BGR")
+        appsink = Gst.ElementFactory.make("appsink")
+        appsink.set_property("emit-signals", True)
+        appsink.set_property("caps", caps)
+        appsink.set_property("sync", False)
 
-        self.pipe.add(queue); self.pipe.add(decodebin); self.pipe.add(convert); self.pipe.add(sink)
-        for e in (queue, decodebin, convert, sink):
+        self.pipe.add(queue); self.pipe.add(decodebin); self.pipe.add(convert); self.pipe.add(appsink)
+        for e in (queue, decodebin, convert, appsink):
             e.sync_state_with_parent()
 
         # webrtc:srcpad -> queue:sink
         q_sink = queue.get_static_pad("sink")
         pad.link(q_sink)
 
-        # queue -> decodebin (dynamic) -> convert -> sink
+        # queue -> decodebin (dynamic) -> convert -> appsink
         if not queue.link(decodebin):
             print("queue->decodebin link failed")
-        if not convert.link(sink):
-            print("videoconvert->sink link failed")
+        if not convert.link(appsink):
+            print("videoconvert->appsink link failed")
 
         decodebin.connect("pad-added", self._on_decodebin_pad_added, convert)
 
+        def on_new_sample(sink):
+            sample = sink.emit("pull-sample")
+            buf = sample.get_buffer()
+            caps = sample.get_caps()
+            arr = None
+            try:
+                # Get video info
+                structure = caps.get_structure(0)
+                width = structure.get_value('width')
+                height = structure.get_value('height')
+                # Extract buffer data
+                success, mapinfo = buf.map(Gst.MapFlags.READ)
+                if not success:
+                    return Gst.FlowReturn.ERROR
+                frame = np.frombuffer(mapinfo.data, dtype=np.uint8)
+                frame = frame.reshape((height, width, 3))
+                buf.unmap(mapinfo)
+                # Now frame is a BGR image (OpenCV format)
+                # Example: show with OpenCV (remove for headless)
+                self.latest_frame = frame
+            except Exception as e:
+                print(f"Error in on_new_sample: {e}")
+            return Gst.FlowReturn.OK
+
+        appsink.connect("new-sample", on_new_sample)
+
     async def _send_json(self, obj):
-        await self.ws.send(json.dumps(obj))
+        if self.ws:
+            await self.ws.send(json.dumps(obj))
 
     def _send_json_threadsafe(self, obj):
         # Schedule the coroutine on the captured asyncio loop from any GI/GStreamer thread
@@ -108,6 +145,9 @@ class OneRecvPeer:
 
     def add_remote_ice(self, mlineindex: int, candidate: str):
         self.webrtc.emit("add-ice-candidate", int(mlineindex), candidate)
+    
+    def get_latest_frame(self):
+        return self.latest_frame
 
     def close(self):
         if self.pipe:
@@ -115,46 +155,50 @@ class OneRecvPeer:
         self.pipe = None
         self.webrtc = None
 
-# ---- WebSocket server ----
-async def handler(websocket):
-    print("Client connected")
-    loop = asyncio.get_running_loop()    # <-- capture the running loop here
-    peer = OneRecvPeer(loop, websocket)
-    try:
-        # Kick the client to start one camera
-        await websocket.send(json.dumps({"type": "HELLO", "cameras": [0]}))
+    async def handler(self, websocket):
+        self.ws = websocket
+        print("Client connected")
+        try:
+            # Kick the client to start one camera
+            await websocket.send(json.dumps({"type": "HELLO", "cameras": [0]}))
 
-        # Build our receive-only pipeline
-        peer.build_pipeline()
+            # Build our receive-only pipeline
+            self.build_pipeline()
 
-        async for msg in websocket:
-            data = json.loads(msg)
+            async for msg in websocket:
+                data = json.loads(msg)
 
-            # ignore initial role message
-            if "role" in data:
-                print("Role:", data["role"])
-                continue
+                # ignore initial role message
+                if "role" in data:
+                    print("Role:", data["role"])
+                    continue
 
-            if "sdp" in data and data["sdp"]["type"] == "offer":
-                await peer.handle_offer(data["sdp"]["sdp"])
-            elif "ice" in data:
-                ice = data["ice"]
-                peer.add_remote_ice(ice["sdpMLineIndex"], ice["candidate"])
-    except websockets.exceptions.ConnectionClosed:
-        print("Client disconnected")
-    finally:
-        peer.close()
+                if "sdp" in data and data["sdp"]["type"] == "offer":
+                    await self.handle_offer(data["sdp"]["sdp"])
+                elif "ice" in data:
+                    ice = data["ice"]
+                    self.add_remote_ice(ice["sdpMLineIndex"], ice["candidate"])
+        except websockets.exceptions.ConnectionClosed:
+            print("Client disconnected")
+        finally:
+            self.close()
 
-async def main():
-    # Pump GLib so GStreamer keeps running in this asyncio app
-    asyncio.create_task(glib_pump())
-
-    async with websockets.serve(handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
-        print(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
-        await asyncio.Future()  # run forever
+    async def async_loop(self):
+        self.loop = asyncio.get_running_loop()              # <-- keep a handle to the main asyncio loop
+        asyncio.create_task(self.glib_pump())
+        async with websockets.serve(self.handler, WS_HOST, WS_PORT, ping_interval=20, ping_timeout=20):
+            print(f"WebSocket server listening on ws://{WS_HOST}:{WS_PORT}")
+            await asyncio.Future() # run forever
+    
+    def async_loop_thread(self):
+        asyncio.run(self.async_loop())
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    peer = OneRecvPeer()
+    while True:
+        frame = peer.get_latest_frame()
+        if frame is not None:
+            cv2.imshow("Received Video", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        time.sleep(1/30)
