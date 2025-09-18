@@ -178,7 +178,7 @@ class RobotInverseKinematics:
             left_ee_z_position = (left_ee_pose @ gripper_offset_l)[2, 3]
             z_min = -0.25
 
-            relu_approx = lambda x: x/2*(1+np.tanh(1e2*x))
+            relu_approx = lambda x: x/2*(1+np.tanh(1e4*x))
 
             penalties = np.array([
                 relu_approx(-(right_ee_z_position - z_min)),
