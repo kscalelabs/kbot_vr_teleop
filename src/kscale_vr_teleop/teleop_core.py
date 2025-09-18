@@ -10,7 +10,7 @@ from line_profiler import profile
 import json
 
 class TeleopCore:
-    def __init__(self, websocket, udp_host='10.33.13.143', udp_port=10000):
+    def __init__(self, websocket, udp_host, udp_port):
         self.websocket = websocket
         self.head_matrix = np.eye(4, dtype=np.float32)
         self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
@@ -149,8 +149,50 @@ class TeleopCore:
         rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
         rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
 
-        msg = json.dumps({"type": "joints", "right": right_arm_joints.tolist(), "left": left_arm_joints.tolist()})
-        print(f"Sending joints: {msg}")
+        # Compute actual end effector poses using forward kinematics
+        # Combine right and left arm joints (5 each) into the expected 10-element array
+        all_joint_angles = np.concatenate([right_arm_joints, left_arm_joints])
+        actual_poses = self.ik_solver.forward_kinematics(all_joint_angles)
+        
+        # Extract actual poses for right and left arms
+        actual_right_pose = actual_poses[0]  # First end effector (right arm)
+        actual_left_pose = actual_poses[1]   # Second end effector (left arm)
+        
+        # Log actual end effector poses for visualization
+        rr.log('actual_right', rr.Transform3D(
+            translation=actual_right_pose[:3, 3], 
+            mat3x3=actual_right_pose[:3, :3], 
+            axis_length=0.1
+        ))
+        rr.log('actual_left', rr.Transform3D(
+            translation=actual_left_pose[:3, 3], 
+            mat3x3=actual_left_pose[:3, :3], 
+            axis_length=0.05
+        ))
+        
+        # Calculate distances between target and actual positions
+        # Target positions: hand_target_left/right (what VR hands want)
+        # Actual positions: actual_left/right_pose (where robot actually is)
+        right_distance = np.linalg.norm(hand_target_right[:3, 3] - actual_right_pose[:3, 3])
+        left_distance = np.linalg.norm(hand_target_left[:3, 3] - actual_left_pose[:3, 3])
+        
+        # Log distances for visualization
+        rr.log("plots/tracking_accuracy/Right Distance", rr.Scalars(right_distance))
+        rr.log("plots/tracking_accuracy/Left Distance", rr.Scalars(left_distance))
+        
+        payload = {
+            "type": "kinematics", 
+            "joints": {
+                "right": right_arm_joints.tolist(), 
+                "left": left_arm_joints.tolist()
+            },
+            "distances": {
+                "right": float(right_distance),
+                "left": float(left_distance)
+            }
+        }
+        msg = json.dumps(payload)
+        print(float(right_distance), float(left_distance))
         await self.websocket.send(msg)
 
         return (right_arm_joints.tolist() + [right_gripper_joint],

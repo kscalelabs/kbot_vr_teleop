@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { handleTracking, handleControllerInput, type localTargetLocation } from './webxrTracking';
-import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, updateMeshPositions, 
+import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, updateSTLPositions, 
   createStatusCanvas, createVideoPlane, loadSTLModels, loadURDFRobot, actuatorMapping } from './sceneHandling';
 
 interface VRViewerProps {
@@ -105,6 +105,28 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
         reject(new Error('no scene ref for initThreeScene'));
       }
     });
+  };
+
+  // Function to get color based on distance (green to red spectrum for both hands)
+  const getDistanceColor = (distance: number): number => {
+    // Clamp distance between 0 and 0.5 for color interpolation
+    const clampedDistance = Math.min(Math.max(distance, 0), 0.5);
+    
+    // Scale distance to 0-1 range for interpolation
+    const scaledDistance = clampedDistance / 0.2;
+    
+    // Interpolate from green (0x00ff00) to red (0xff0000)
+    const red = Math.floor(scaledDistance * 255);
+    const green = Math.floor((1 - scaledDistance) * 255);
+    
+    return (red << 16) | (green << 8) | 0; // RGB format
+  };
+
+  // Function to update STL mesh color based on distance
+  const updateMeshColor = (mesh: THREE.Mesh | null, color: number, handSide: string) => {
+    if (mesh && mesh.material instanceof THREE.MeshLambertMaterial) {
+      mesh.material.color.setHex(color);
+    }
   };
 
   const processJointArray = (side: string, jointArray: number[]) => {
@@ -233,7 +255,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
 
       // Tracking → positions/orientations → STL mesh updates
       let handPositions = handleTracking(frame, refSpace, wsRef, lastHandSendRef, sceneStateRef.current.pauseCommands);
-      if (handPositions) updateMeshPositions(sceneStateRef.current, handPositions);
+      if (handPositions) updateSTLPositions(sceneStateRef.current, handPositions);
 
       renderer.render(sceneStateRef.current.scene, camera);
     });
@@ -256,14 +278,35 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
 
         webSocket.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          if (data.type === "joints") {
+          if (data.type === "kinematics") {
             // Process left and right joint arrays
-            if (data.left && Array.isArray(data.left)) {
-              processJointArray('left', data.left);
-            }
+            if(data.joints) {
+              if (data.joints.left && Array.isArray(data.joints.left)) {
+                processJointArray('left', data.joints.left);
+              }
 
-            if (data.right && Array.isArray(data.right)) {
-              processJointArray('right', data.right);
+              if (data.joints.right && Array.isArray(data.joints.right)) {
+                processJointArray('right', data.joints.right);
+              }
+            }
+            
+            // Process distance data for STL mesh color updates
+            if(data.distances) {
+              console.log(`Received distances - Left: ${data.distances.left?.toFixed(3)}, Right: ${data.distances.right?.toFixed(3)}`);
+              
+              // Update left hand mesh color based on its own distance (green to red spectrum)
+              if (data.distances.left !== undefined && sceneStateRef.current.leftHandMesh) {
+                const leftDistance = data.distances.left;
+                const leftColor = getDistanceColor(leftDistance);
+                updateMeshColor(sceneStateRef.current.leftHandMesh, leftColor, 'LEFT');
+              }
+              
+              // Update right hand mesh color based on its own distance (green to red spectrum)
+              if (data.distances.right !== undefined && sceneStateRef.current.rightHandMesh) {
+                const rightDistance = data.distances.right;
+                const rightColor = getDistanceColor(rightDistance);
+                updateMeshColor(sceneStateRef.current.rightHandMesh, rightColor, 'RIGHT');
+              }
             }
           }
         };
@@ -379,3 +422,4 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     </div>
   );
 }
+

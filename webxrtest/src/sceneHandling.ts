@@ -106,7 +106,7 @@ export type sceneState = {
       }
 
   // Update STL mesh positions based on hand tracking
-  export const updateMeshPositions = (sceneState: sceneState, trackingResult: trackingResult) => {
+  export const updateSTLPositions = (sceneState: sceneState, trackingResult: trackingResult) => {
     if (!sceneState.scene) return;
     const handPositions = trackingResult.handPositions;
     const type = trackingResult.type;
@@ -130,14 +130,8 @@ export type sceneState = {
         sceneState.leftHandMesh.quaternion.multiply(STL_Z_OFFSET);
       }
       sceneState.leftHandMesh.visible = true;
-      if (sceneState.leftSphere) {
-        sceneState.leftSphere.position.set(position[0], position[1], position[2]);
-        sceneState.leftSphere.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
-        sceneState.leftSphere.visible = true;
-      }
     } else if (sceneState.leftHandMesh) {
       sceneState.leftHandMesh.visible = false;
-      if (sceneState.leftSphere) sceneState.leftSphere.visible = false;
     }
 
     // Update right hand mesh
@@ -151,22 +145,14 @@ export type sceneState = {
         sceneState.rightHandMesh.quaternion.multiply(STL_Z_OFFSET);
       }
       sceneState.rightHandMesh.visible = true;
-      if (sceneState.rightSphere) {
-        sceneState.rightSphere.position.set(position[0], position[1], position[2]);
-        sceneState.rightSphere.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
-        sceneState.rightSphere.visible = true;
-      }
     } else if (sceneState.rightHandMesh) {
       sceneState.rightHandMesh.visible = false;
-      if (sceneState.rightSphere) sceneState.rightSphere.visible = false;
     }
 
     // Hide meshes if no hand positions
     if (!handPositions.left && !handPositions.right) {
       if (sceneState.leftHandMesh) sceneState.leftHandMesh.visible = false;
       if (sceneState.rightHandMesh) sceneState.rightHandMesh.visible = false;
-      if (sceneState.leftSphere) sceneState.leftSphere.visible = false;
-      if (sceneState.rightSphere) sceneState.rightSphere.visible = false;
     }
   };
 
@@ -179,15 +165,20 @@ export type sceneState = {
       loader.load(
         '/prt0001.stl', // Path to STL file
         (geometry) => {
-          // Create material that responds to ambient light
-          const material = new THREE.MeshLambertMaterial({
+          // Create separate materials for each hand to avoid color sharing
+          const leftMaterial = new THREE.MeshLambertMaterial({
+            color: 0x888888, // Gray color
+            side: THREE.DoubleSide
+          });
+          
+          const rightMaterial = new THREE.MeshLambertMaterial({
             color: 0x888888, // Gray color
             side: THREE.DoubleSide
           });
 
-          // Create left and right hand meshes from the same geometry
-          const leftMesh = new THREE.Mesh(geometry, material);
-          const rightMesh = new THREE.Mesh(geometry, material);
+          // Create left and right hand meshes with separate materials
+          const leftMesh = new THREE.Mesh(geometry, leftMaterial);
+          const rightMesh = new THREE.Mesh(geometry, rightMaterial);
 
           // Calculate appropriate scale based on STL bounding box
           geometry.computeBoundingBox();
