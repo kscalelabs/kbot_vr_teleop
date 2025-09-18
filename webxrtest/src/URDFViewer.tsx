@@ -2,19 +2,19 @@ import React, { useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { handleHandTracking, handleControllerTracking } from './webxrTracking';
+import { handleTracking, type localTargetLocation } from './webxrTracking';
 
 interface URDFViewerProps {
   stream: MediaStream | null;
   url: string;
-  hands: boolean;
 }
 
-export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
+
+
+export default function URDFViewer({ stream, url }: URDFViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const lastHandSendRef = useRef<number>(0);
-  const [started, setStarted] = useState(false);
   const [status, setStatus] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const threeSceneRef = useRef<THREE.Scene|null>(null);
@@ -31,11 +31,12 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
   const [videoPlaneReady, setVideoPlaneReady] = useState(false);
   const [ready, setReady] = useState(false);
   const robotRef = useRef<any>(null);
-  const [wsMapData, setWsMapData] = useState<any>(null);
-  const [mapData, setMapData] = useState<any>(null);
+
+  const mapDataRef = useRef<any>(null);
   const redSphereRef = useRef<THREE.Mesh|null>(null);
   const pauseCommandsRef = useRef<boolean>(false);
   const previousButtonStatesRef = useRef<Map<string, boolean>>(new Map());
+  const wsMapDataRef = useRef<any>(null);
   
   useEffect(() => {
     // Use the first available stream for the billboard
@@ -151,26 +152,30 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
   }, [pauseCommandsRef.current]);
 
   // Load joint mapping data
-  useEffect(() => {
-    const loadMappingData = async () => {
-      try {
-        const wsMapResponse = await fetch('/wsmap.json');
-        const wsMap = await wsMapResponse.json();
-        setWsMapData(wsMap);
-        
-        const mapResponse = await fetch('/map.json');
-        const map = await mapResponse.json();
-        setMapData(map);
-      } catch (error) {
-        console.error('Error loading mapping data:', error);
-      }
-    };
+ 
+  const loadMappingData = async () => {
+    return new Promise(async(resolve, reject) => {
+    try {
+      const wsMapResponse = await fetch('/wsmap.json');
+      const wsMap = await wsMapResponse.json();
+      wsMapDataRef.current = wsMap;
+      
+      const mapResponse = await fetch('/map.json');
+      const map = await mapResponse.json();
+      mapDataRef.current = map;
+      resolve(true);
+    } catch (error) {
+      console.error('Error loading mapping data:', error);
+      reject(error);
+    }
+    })
+  };
     
-    loadMappingData();
-  }, []);
+
 
   // Load STL models when component mounts
-  useEffect(() => {
+  const loadSTLModels = async() => {
+    return new Promise((resolve, reject) => {
     const loader = new STLLoader();
     
     // Load STL file
@@ -211,57 +216,40 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
         if (threeSceneRef.current) {
           threeSceneRef.current.add(leftMesh);
           threeSceneRef.current.add(rightMesh);
+          resolve(true);
         }
+        reject(new Error('no scene ref for stl'));
       },
       (progress) => {
         // Progress callback
       },
       (error) => {
         console.error('Error loading STL:', error);
-        // Fallback to cubes if STL fails
-        createFallbackCubes();
+        reject(error);
       }
     );
+    });
+    
 
     // Clean up meshes when component unmounts
-    return () => {
-      if (leftHandMeshRef.current && threeSceneRef.current) {
-        threeSceneRef.current.remove(leftHandMeshRef.current);
-        leftHandMeshRef.current = null;
-      }
-      if (rightHandMeshRef.current && threeSceneRef.current) {
-        threeSceneRef.current.remove(rightHandMeshRef.current);
-        rightHandMeshRef.current = null;
-      }
-      if (leftSphereRef.current && threeSceneRef.current) {
-        threeSceneRef.current.remove(leftSphereRef.current);
-        leftSphereRef.current = null;
-      }
-      if (rightSphereRef.current && threeSceneRef.current) {
-        threeSceneRef.current.remove(rightSphereRef.current);
-        rightSphereRef.current = null;
-      }
-    };
-  }, []);
-
-  // Fallback function to create cubes if STL loading fails
-  const createFallbackCubes = () => {
-    if (threeSceneRef.current && !leftHandMeshRef.current && !rightHandMeshRef.current) {
-      const cubeGeometry = new THREE.BoxGeometry(0.05, 0.05, 0.05);
-      const cubeMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
-
-      const leftCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-      const rightCube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-
-      leftCube.visible = false;
-      rightCube.visible = false;
-
-      leftHandMeshRef.current = leftCube;
-      rightHandMeshRef.current = rightCube;
-
-      threeSceneRef.current.add(leftCube);
-      threeSceneRef.current.add(rightCube);
-    }
+    // return () => {
+    //   if (leftHandMeshRef.current && threeSceneRef.current) {
+    //     threeSceneRef.current.remove(leftHandMeshRef.current);
+    //     leftHandMeshRef.current = null;
+    //   }
+    //   if (rightHandMeshRef.current && threeSceneRef.current) {
+    //     threeSceneRef.current.remove(rightHandMeshRef.current);
+    //     rightHandMeshRef.current = null;
+    //   }
+    //   if (leftSphereRef.current && threeSceneRef.current) {
+    //     threeSceneRef.current.remove(leftSphereRef.current);
+    //     leftSphereRef.current = null;
+    //   }
+    //   if (rightSphereRef.current && threeSceneRef.current) {
+    //     threeSceneRef.current.remove(rightSphereRef.current);
+    //     rightSphereRef.current = null;
+    //   }
+    // };
   };
 
   // Handle controller input for pause toggle
@@ -325,8 +313,9 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
   };
 
   // Load URDF robot after scene is initialized
-  const loadURDFRobot = () => {
-    if (threeSceneRef.current && !robotRef.current) {
+  const loadURDFRobot = async() => {
+    return new Promise((resolve, reject) => {
+    if (threeSceneRef.current) {
       const loader = new URDFLoader();
       
       // Set up STL loader for mesh loading (same as urdf-viewer)
@@ -341,6 +330,7 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
       loader.load(
         '/robot.urdf',
         (robot) => {
+          updateStatus('URDF robot loaded1');
           robotRef.current = robot;
           
           // Scale the robot to a reasonable size
@@ -357,21 +347,29 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
           
           threeSceneRef.current.add(robot);
           
-          setReady(true);
+          resolve(true);
         },
         (progress) => {
           // Progress callback
         },
         (error) => {
+          updateStatus('Error loading URDF');
           console.error('Error loading URDF:', error);
+          reject(error);
         }
       );
     }
+    else {
+      updateStatus('no scene ref');
+      reject(new Error('no scene ref'));
+    }
+    });
   };
 
   // Initialize Three.js scene
-  const initThreeScene = () => {
-    if (!threeSceneRef.current) {
+  const initThreeScene = async() => {
+    return new Promise((resolve, reject) => {
+    try {
       const scene = new THREE.Scene();
       
       // Set a background color
@@ -388,13 +386,18 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
       threeSceneRef.current = scene;
       console.log('Three.js scene initialized');
       // Ensure controller spheres exist
-      createControllerSpheres();
+      // createControllerSpheres();
+      resolve(true);
     }
+    catch (error) {
+      updateStatus('Error initializing Three.js scene');
+      reject(new Error('no scene ref for initThreeScene'));
+    }
+    });
   };
 
-  // Process joint array (left or right) - convert indices to URDF joint names
   const processJointArray = (side: string, jointArray: number[]) => {
-    if (!wsMapData || !wsMapData[side]) {
+    if (!wsMapDataRef.current || !wsMapDataRef.current[side]) {
       console.error(`No mapping found for side: ${side}`);
       return;
     }
@@ -407,7 +410,7 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
     const jointUpdates: { [key: string]: number } = {};
     
     jointArray.forEach((angleInRadians, index) => {
-      const jointName = wsMapData[side][index.toString()];
+      const jointName = wsMapDataRef.current[side][index.toString()];
       if (jointName && robotRef.current?.joints[jointName]) {
         // Store update for batch processing
         jointUpdates[jointName] = angleInRadians;
@@ -423,7 +426,7 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
   };
 
   // Update STL mesh positions based on hand tracking
-  const updateMeshPositions = (handPositions: any) => {
+  const updateMeshPositions = (handPositions: localTargetLocation) => {
     if (!threeSceneRef.current) return;
     
     // Add meshes to scene if they exist but aren't added yet
@@ -507,6 +510,7 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
       antialias: true,
       alpha: true,
     });
+
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.xr.enabled = true;
@@ -515,7 +519,17 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
     renderer.xr.setReferenceSpaceType('local');
   
     threeRendererRef.current = renderer;
-  
+    await initThreeScene();
+    updateStatus('Three.js scene initialized');
+    await loadSTLModels();
+    updateStatus('STL models loaded');
+    await loadURDFRobot();
+    updateStatus('URDF robot loaded');
+    await loadMappingData();
+    updateStatus('Mapping data loaded');
+    await setupTrackingWebSocket()
+    updateStatus('Tracking WebSocket setup');
+
     // Request the XR session with appropriate features
     const session = await navigator.xr.requestSession('immersive-vr', {
       requiredFeatures: ['local-floor', 'viewer', 'hand-tracking'],
@@ -540,24 +554,9 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
     });
 
     renderer.xr.addEventListener('sessionend', () => {
-      // Reset camera position when exiting VR
-      camera.position.set(0, 2, 2);
-      camera.lookAt(0, 0, -2);
       updateStatus('Camera reset for non-VR view');
     });
-
-    // Setup WS (non-blocking) for tracking data
-    setupTrackingWebSocket().catch(err => {
-      console.warn('WebSocket setup failed, continuing without it:', err);
-      updateStatus('WebSocket connection failed, continuing with XR...');
-    });
-  
-    // Init scene (lights, etc.)
-    initThreeScene();
     
-    // Load URDF robot after scene is ca
-    loadURDFRobot();
-  
      // Create a stable camera (Three will substitute XR camera internally)
      const camera = new THREE.PerspectiveCamera(
        75, // Field of view
@@ -565,20 +564,10 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
        0.1, // Near plane
        100  // Far plane
      );
-     
-     // Manual camera orbiting (no OrbitControls needed for WebXR)
-     
-     // Handle resize
-     const onResize = () => {
-       camera.aspect = window.innerWidth / window.innerHeight;
-       camera.updateProjectionMatrix();
-       renderer.setSize(window.innerWidth, window.innerHeight);
-     };
-    window.addEventListener('resize', onResize);
+    
 
     session.addEventListener('end', () => {
       updateStatus('XR session ended');
-      window.removeEventListener('resize', onResize);
       if (wsRef.current) {
         wsRef.current.close();
         wsRef.current = null;
@@ -618,19 +607,14 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
       handleControllerInput(frame, refSpace);
       
       // Tracking → positions/orientations → STL mesh updates
-      let handPositions = null;
-      if (hands) {
-        handPositions = handleHandTracking(frame, refSpace, wsRef, lastHandSendRef);
-      } else {
-        handPositions = handleControllerTracking(frame, refSpace, wsRef, lastHandSendRef, pauseCommandsRef.current);
-      }
+      let handPositions = handleTracking(frame, refSpace, wsRef, lastHandSendRef, pauseCommandsRef.current);
       if (handPositions) updateMeshPositions(handPositions);
 
       renderer.render(threeSceneRef.current, camera);
     });
   };
 
-  const setupTrackingWebSocket = () => {
+  const setupTrackingWebSocket = async() => {
     return new Promise((resolve, reject) => {
       try {
         let webSocket = new WebSocket(url);
@@ -639,7 +623,6 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
           webSocket.send(JSON.stringify({
             role: "teleop",
             robot_id: "motion",
-            control_type: hands ? "hand" : "controller"
           }));
           wsRef.current = webSocket;
           updateStatus('Hand tracking WebSocket connected');
@@ -680,27 +663,26 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      {!started && (
-        <div style={{ marginBottom: '20px' }}>
-          <button
-            onClick={() => { 
-              setStarted(true); 
-              startVR(); 
-            }}
-            style={{ 
-              padding: '15px 30px', 
-              fontSize: '18px', 
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Start VR Robot ({hands ? 'Hand' : 'Controller'} Tracking)
-          </button>
-        </div>
-      )}
+   
+      <div style={{ marginBottom: '20px' }}>
+        <button
+          onClick={() => { 
+            startVR(); 
+          }}
+          style={{ 
+            padding: '15px 30px', 
+            fontSize: '18px', 
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer'
+          }}
+        >
+          Start VR Robot Tracking
+        </button>
+      </div>
+      
       
       {status && (
         <div style={{ 
@@ -708,7 +690,8 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
           padding: '10px', 
           backgroundColor: 'red', 
           border: '1px solid #dee2e6', 
-          borderRadius: '4px'
+          borderRadius: '4px',
+          fontSize: '30px'
         }}>
           Status: {status}
         </div>
@@ -722,15 +705,7 @@ export default function URDFViewer({ stream, url, hands }: URDFViewerProps) {
         autoPlay
       />
       
-      <canvas 
-        ref={canvasRef} 
-        style={{ 
-          width: '100%', 
-          height: '400px',
-          border: '1px solid #ccc',
-          display: started ? 'block' : 'none'
-        }} 
-      />
+      <canvas  ref={canvasRef} />
     </div>
   );
 }

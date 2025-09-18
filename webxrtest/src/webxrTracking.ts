@@ -1,5 +1,21 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
+export type localTargetLocation = {
+  left: {
+    position: number[];
+    orientation: number[];
+  };
+  right: {
+    position: number[];
+    orientation: number[];
+  };
+};
+
+export type trackingResult = {
+  handPositions: localTargetLocation;
+  payload: any;
+}
+
 function shiftTargetWithOrientation(pos, ori, offset) {
 
   const rotateVectorByQuaternion = (v, q) => {
@@ -23,17 +39,10 @@ function shiftTargetWithOrientation(pos, ori, offset) {
     pos.z - forward.z * offset,
   ]
 }
-export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef) {
-  const now = performance.now();
-  const sendInterval = 1000 / 30; // 30 Hz
-  const shouldSend = now - lastHandSendRef.current >= sendInterval;
-  
-  if (shouldSend) {
-    lastHandSendRef.current = now;
-  }
-  
+
+export function handleHandTracking(frame, referenceSpace): trackingResult {  
   const handData = {};
-  const handPositions = { left: null, right: null };
+  const handPositions: localTargetLocation = { left: null, right: null };
   const JOINT_ORDER = [
     "wrist", "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
     "index-finger-metacarpal", "index-finger-phalanx-proximal", "index-finger-phalanx-intermediate", 
@@ -55,9 +64,22 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
       if (wristJoint && frame.getJointPose) {
         const wristPose = frame.getJointPose(wristJoint, referenceSpace);
         if (wristPose) {
+          const ori = wristPose.transform.orientation;
+          const orientation = [
+            ori.x,
+            ori.y,
+            ori.z,
+            ori.w
+          ];
+          const pos = wristPose.transform.position;
+          const posititon = [
+            pos.x,
+            pos.y,
+            pos.z
+          ]
           handPositions[handedness] = {
-            position: wristPose.transform.position,
-            orientation: wristPose.transform.orientation
+            position: posititon,
+            orientation: orientation
           };
         }
       }
@@ -79,33 +101,12 @@ export function handleHandTracking(frame, referenceSpace, wsRef, lastHandSendRef
       handData[handedness] = continuousArray;
     }
   }
-  // Send WebSocket data only at specified interval
-  if (shouldSend && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(handData).length > 0) {
-    try {
-      wsRef.current.send(JSON.stringify(handData));
-    } catch (error) {
-      console.log(`Failed to send hand tracking data: ${error}`);
-    }
-  }
-  
-  // Always return hand positions for local rendering
-  return handPositions;
+
+  return { handPositions: handPositions, payload: handData };
 }
 
-export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands) {
-  const now = performance.now();
-  const sendInterval = 1000 / 40; // 0 Hz
-  const shouldSend = now - lastHandSendRef.current >= sendInterval;
-  
-  if (shouldSend) {
-    lastHandSendRef.current = now;
-  }
-  else{
-    return
-  }
-
-  
-  const controllerData = {};  
+export function handleControllerTracking(frame, referenceSpace): trackingResult {  
+  const controllerData: localTargetLocation = { left: null, right: null };  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
       const handedness = inputSource.handedness;
@@ -142,16 +143,32 @@ export function handleControllerTracking(frame, referenceSpace, wsRef, lastHandS
       }
     }
   }
+
+  return { handPositions: controllerData, payload: controllerData };
+}
+
+export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands): localTargetLocation | null {
+  const now = performance.now();
+  const sendInterval = 1000 / 40; // 0 Hz
+  const shouldSend = now - lastHandSendRef.current >= sendInterval;
   
-  // Send WebSocket data only at specified interval
-  if (!pauseCommands && shouldSend && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(controllerData).length > 0) {
+  if (shouldSend) {
+    lastHandSendRef.current = now;
+  }
+  else{
+    return null;
+  }
+
+  let respone = handleHandTracking(frame, referenceSpace);
+  if(respone.handPositions.left == null || respone.handPositions.right == null){
+    respone = handleControllerTracking(frame, referenceSpace);
+  }
+  if (!pauseCommands && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(respone.payload).length > 0) {
     try {
-      wsRef.current.send(JSON.stringify(controllerData));
+      wsRef.current.send(JSON.stringify(respone.payload));
     } catch (error) {
       console.log(`Failed to send controller tracking data: ${error}`);
     }
   }
-  
-  // Always return controller positions for local rendering
-  return controllerData;
+  return respone.handPositions;
 }

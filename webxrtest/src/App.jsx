@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import VideoScreenWeb from './Video.tsx';
 import SideBySideVideo from './SideBySideVideo.tsx';
-import Billboard from './Billboard.tsx';
+
 import Sphere from './Sphere.tsx';
 import URDFViewer from './URDFViewer.tsx';
 
@@ -12,7 +12,6 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
-  const [hands, setHands] = useState(true);
   
   const handleConnect = () => {
     setIsConnected(true);
@@ -63,51 +62,8 @@ function App() {
         }}>
           K-Scale
         </h1>
-
-        {/* Tracking Mode Toggle */}
-        <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-          <label style={{ display: 'block', marginBottom: '10px', color: '#ffffff', fontSize: '16px' }}>
-            Tracking Mode:
-          </label>
-          <div style={{ display: 'flex', gap: '0px', border: '2px solid #333', borderRadius: '8px', overflow: 'hidden' }}>
-            <button
-              onClick={() => setHands(false)}
-              disabled={isConnected}
-              style={{
-                flex: 1,
-                padding: '12px 20px',
-                backgroundColor: !hands ? '#007bff' : '#333333',
-                color: !hands ? '#ffffff' : '#cccccc',
-                border: 'none',
-                cursor: isConnected ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: !hands ? 'bold' : 'normal',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Controller
-            </button>
-            <button
-              onClick={() => setHands(true)}
-              disabled={isConnected}
-              style={{
-                flex: 1,
-                padding: '12px 20px',
-                backgroundColor: hands ? '#007bff' : '#333333',
-                color: hands ? '#ffffff' : '#cccccc',
-                border: 'none',
-                cursor: isConnected ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: hands ? 'bold' : 'normal',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Hands
-            </button>
-          </div>
-        </div>
         
-        <div style={{ textAlign: 'center' }}>
+        {/* <div style={{ textAlign: 'center' }}>
           <label htmlFor="url-input" style={{ display: 'block', marginBottom: '5px', color: '#ffffff' }}>
             WebSocket URL:
           </label>
@@ -128,8 +84,7 @@ function App() {
             }}
             placeholder="Enter WebSocket URL"
           />
-        </div>
-
+        </div> */}
         <div style={{ marginBottom: '20px', textAlign: 'center' }}>
           <label style={{ display: 'block', marginBottom: '10px', color: '#ffffff', fontSize: '16px' }}>
             View Mode:
@@ -152,7 +107,7 @@ function App() {
             >
               Browser
             </button>
-            <button
+            {/* <button
               onClick={() => setViewMode('billboard')}
               disabled={isConnected}
               style={{
@@ -185,7 +140,7 @@ function App() {
               }}
             >
               Sphere
-            </button>
+            </button> */}
             <button
               onClick={() => setViewMode('urdf')}
               disabled={isConnected}
@@ -201,7 +156,7 @@ function App() {
                 transition: 'all 0.2s ease'
               }}
             >
-              URDF
+              VR
             </button>
           </div>
         </div>
@@ -306,24 +261,22 @@ function App() {
           />
 
           {/* Conditionally mount the view component based on selected mode */}
-          { viewMode === 'billboard' ? (
+          { viewMode === 'urdf' ? (
        
-              <Billboard 
-                stream={streams[0] || null}
-                url={url}
-                hands={hands}
-              />
-          ) : viewMode === 'sphere' ? (
-            <Sphere
-              stream1={streams[0] || null}
-              stream2={streams[1] || null}
-              url={url}
-            />
-          ) : viewMode === 'urdf' ? (
+          //     <Billboard 
+          //       stream={streams[0] || null}
+          //       url={url}
+          //     />
+          // ) : viewMode === 'sphere' ? (
+          //   <Sphere
+          //     stream1={streams[0] || null}
+          //     stream2={streams[1] || null}
+          //     url={url}
+          //   />
+          // ) : viewMode === 'urdf' ? (
             <URDFViewer
               stream={streams[0] || null}
               url={url}
-              hands={hands}
             />
           ) : (
             <SideBySideVideo 

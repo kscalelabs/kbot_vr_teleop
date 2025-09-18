@@ -150,6 +150,7 @@ class TeleopCore:
         rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
 
         msg = json.dumps({"type": "joints", "right": right_arm_joints.tolist(), "left": left_arm_joints.tolist()})
+        print(f"Sending joints: {msg}")
         await self.websocket.send(msg)
 
         return (right_arm_joints.tolist() + [right_gripper_joint],
