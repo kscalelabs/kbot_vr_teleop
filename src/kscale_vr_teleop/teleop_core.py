@@ -191,9 +191,7 @@ class TeleopCore:
                 "left": float(left_distance)
             }
         }
-        msg = json.dumps(payload)
-        print(float(right_distance), float(left_distance))
-        await self.websocket.send(msg)
+        await self.websocket.send(json.dumps(payload))
 
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
