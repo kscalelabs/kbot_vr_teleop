@@ -206,19 +206,41 @@ class WebRTCClient:
 
 async def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='WebRTC Video Streaming Client')
+    parser = argparse.ArgumentParser(description='WebRTC Video Streaming Server')
     parser.add_argument('--flip', action='store_true', 
                        help='Vertically flip the video stream')
+    parser.add_argument('--host', default='0.0.0.0', help='Host to bind the signaling server')
+    parser.add_argument('--port', type=int, default=8013, help='Port for signaling server')
     args = parser.parse_args()
-    
+
     loop = asyncio.get_running_loop()
     client = WebRTCClient(loop, flip_video=args.flip)
-    
+
     # Start the GLib main loop iteration task
     asyncio.create_task(glib_main_loop_iteration())
-    
-    # Connect to the WebSocket server
-    await client.connect_websocket()
+
+    # Start WebSocket server to accept a single app connection
+    async def ws_handler(ws, path):
+        print(f"WebSocket client connected: {ws.remote_address}")
+        client.ws = ws
+        try:
+            async for message in ws:
+                client.handle_client_message(message)
+        except Exception as e:
+            print(f"WebSocket handler error: {e}")
+        finally:
+            print("WebSocket client disconnected")
+            client.ws = None
+            # stop pipeline when client disconnects
+            if client.pipe:
+                client.pipe.set_state(Gst.State.NULL)
+
+    print(f"Starting signaling server on ws://{args.host}:{args.port}")
+    server = await websockets.serve(ws_handler, args.host, args.port, ping_interval=10, ping_timeout=300)
+    try:
+        await server.wait_closed()
+    except KeyboardInterrupt:
+        print("Signaling server shutting down...")
 
 if __name__ == "__main__":
     asyncio.run(main())
