@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 tracking_handler = None
 
+robot_ip = os.environ.get("ROBOT_IP", "10.33.13.254")
 
 class RobotAppPair:
     def __init__(self, robot_id: str, robot_ws):
@@ -156,7 +157,7 @@ async def handler(websocket):
         # elif role == "app":
         #     await handle_app(websocket, robot_id, False)
         elif role == "teleop":
-            tracking_handler = TrackingHandler(websocket, udp_host=os.environ.get("ROBOT_IP", "10.33.13.254"))
+            tracking_handler = TrackingHandler(websocket, udp_host=robot_ip)
             await handle_teleop(websocket, robot_id)
         else:
             websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
@@ -169,15 +170,13 @@ async def handler(websocket):
     #     logger.error(f"Error in handler: {e}")
 
 async def main():
+
+    async with websockets.connect(robot_ip) as websocket:
+        print("Connected to WebSocket server")
+        await handler(websocket)
     
-    server = await websockets.serve(handler, "0.0.0.0", 8013, ping_interval=10,   # send a ping every 20s
-    ping_timeout=300 )
     logger.info(f"Robot-App signaling server running on ws://0.0.0.0:8013")
     
-    try:
-        await server.wait_closed()
-    except KeyboardInterrupt:
-        logger.info("Server shutting down...")
 
 if __name__ == "__main__":
     asyncio.run(main())

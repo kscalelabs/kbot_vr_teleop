@@ -13,10 +13,11 @@ from gi.repository import Gst, GstWebRTC, GstSdp, GLib
 
 Gst.init(None)
 
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # WebSocket configuration
-# HOST_URL= "wss://c47174bc6ce1.ngrok-free.app"
-ip = os.environ.get("HOST_IP", "10.33.13.51")
-HOST_URL= f"ws://{ip}:8013"
 PIPELINE_DESC = '''
 webrtcbin name=sendrecv bundle-policy=max-bundle stun-server=stun://stun.l.google.com:19302
 '''
@@ -182,19 +183,17 @@ class WebRTCClient:
             ice = msg['ice']
             self.webrtc.emit("add-ice-candidate", ice['sdpMLineIndex'], ice['candidate'])
 
-    async def connect_websocket(self):
+    async def connect_websocket(self, websocket):
         """Connect to WebSocket server and handle messages"""
         try:
-            print(f"Connecting to {HOST_URL}...")
-            async with websockets.connect(HOST_URL) as websocket:
-                print("Connected to WebSocket server")
-                self.ws = websocket
-                
-                # Send initial HELLO message to start pipeline
-                await websocket.send(json.dumps({"role": "robot", "robot_id": "box"}))
-                
-                async for message in websocket:
-                    self.handle_client_message(message)
+            print("Connected to WebSocket server")
+            self.ws = websocket
+            
+            # Send initial HELLO message to start pipeline
+            await websocket.send(json.dumps({"role": "robot", "robot_id": "box"}))
+            
+            async for message in websocket:
+                self.handle_client_message(message)
                     
         except websockets.exceptions.ConnectionClosed:
             print("WebSocket connection closed")
@@ -217,8 +216,12 @@ async def main():
     # Start the GLib main loop iteration task
     asyncio.create_task(glib_main_loop_iteration())
     
-    # Connect to the WebSocket server
-    await client.connect_websocket()
+
+    server = await websockets.serve(client.connect_websocket, "0.0.0.0", 8013, ping_interval=10, ping_timeout=300)
+    try:
+        await server.wait_closed()
+    except KeyboardInterrupt:
+        logger.info("Server shutting down...")
 
 if __name__ == "__main__":
     asyncio.run(main())
