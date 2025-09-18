@@ -213,9 +213,9 @@ class RobotInverseKinematics:
             method='trf',
             options={
                 'jac_sparsity': jac_sparsity_mat,
-                'xtol': 1e-3,
-                'gtol': 1e-3,
-                'ftol': 1e-3,
+                'xtol': 1e-4,
+                'gtol': 1e-4,
+                'ftol': 1e-4,
             },
         )
 
