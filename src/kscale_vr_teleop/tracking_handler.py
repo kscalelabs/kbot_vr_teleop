@@ -54,6 +54,7 @@ else:
 
 class TrackingHandler:
     def __init__(self, websocket, udp_host, udp_port=10000):
+        print("udp_host: ", udp_host)
         self.udp_host = udp_host
         self.udp_port = udp_port
 
@@ -78,7 +79,7 @@ class TrackingHandler:
             raise RuntimeError(f"Missing env: {', '.join(missing)}")
 
         self.teleop_core = TeleopCore(websocket, udp_host, udp_port)
-        self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
+        self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10002)
 
         self.room: rtc.Room | None = None
 
