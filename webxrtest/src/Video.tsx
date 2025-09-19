@@ -7,10 +7,7 @@ const configuration = {
 
 interface VideoProps {
   setStreams: (streams: MediaStream[]) => void;
-  vector: { x: number; y: number; z: number };
   setIsConnected: (isConnected: boolean) => void;
-  setLocalStream: (stream: MediaStream) => void;
-  call: boolean;
   url: string;
   signalingUrl: string;
   activeCameras: number[];
@@ -18,16 +15,13 @@ interface VideoProps {
 
 export default function VideoScreenWeb({
   setStreams,
-  vector,
   setIsConnected,
-  call,
-  signalingUrl,
   url,
+  signalingUrl,
   activeCameras,
 }: VideoProps) {
   const pc = useRef<RTCPeerConnection | null>(null);
   const ws = useRef<WebSocket | null>(null);
-  const dataChannel = useRef<RTCDataChannel | null>(null);
   const streamsAdded = useRef(0);
   const currentStreams = useRef<MediaStream[]>([]);
 
@@ -61,17 +55,6 @@ export default function VideoScreenWeb({
             })
           );
         }
-      };
-
-      pc.current.ondatachannel = (event) => {
-        console.log('Data channel received:', event.channel.label);
-        dataChannel.current = event.channel;
-
-        dataChannel.current.onmessage = (msg) => {
-          console.log('Message from robot:', msg.data);
-        };
-        dataChannel.current.onopen = () => console.log('Data channel opened');
-        dataChannel.current.onclose = () => console.log('Data channel closed');
       };
     },
     [setStreams]
@@ -129,10 +112,8 @@ export default function VideoScreenWeb({
 
   const cleanup = useCallback(() => {
     console.log('Cleaning up WebRTC connection');
-    dataChannel.current?.close();
     pc.current?.getSenders().forEach((sender) => sender.track?.stop());
     pc.current?.close();
-    dataChannel.current = null;
     pc.current = null;
     streamsAdded.current = 0;
     currentStreams.current = [];
@@ -158,13 +139,6 @@ export default function VideoScreenWeb({
     return cleanup;
   }, []);
 
-  useEffect(() => {
-    if (dataChannel.current?.readyState === 'open') {
-      dataChannel.current.send(JSON.stringify(vector));
-    } else {
-      console.log('Data channel not open');
-    }
-  }, [vector]);
 
   return null;
 }

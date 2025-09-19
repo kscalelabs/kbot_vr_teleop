@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { handleTracking } from './webxrTracking';
+// import { handleTracking } from './lib/webxrTracking';
 
 const flipCenter = (centerX: number, centerY: number, width: number, height: number) => {
   return [centerX, centerY];

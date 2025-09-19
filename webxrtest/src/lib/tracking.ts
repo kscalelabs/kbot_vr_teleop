@@ -1,6 +1,6 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
-import { sceneState } from './sceneHandling';
+import { sceneState } from './three-scene';
 
 export type localTargetLocation = {
   left: {

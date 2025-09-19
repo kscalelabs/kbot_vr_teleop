@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import VideoScreenWeb from './Video.tsx';
-import SideBySideVideo from './SideBySideVideo.tsx';
-import VRViewer from './URDFViewer.tsx';
+import VideoScreenWeb from './Video';
+import SideBySideVideo from './SideBySideVideo';
+import VRViewer from './URDFViewer';
+
+type DisplayMode = 'vr' | 'browser';
 
 function App() {
   // Utility functions for URL parameters
@@ -11,14 +13,14 @@ function App() {
   };
 
   const updateUrlParam = (name, value) => {
-    const url = new URL(window.location);
+    const url = new URL(window.location.toString());
     url.searchParams.set(name, value);
     window.history.replaceState({}, '', url);
   };
 
   const portString = window.location.port ? `:${window.location.port}` : '';
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
-  const [viewMode, setViewMode] = useState("vr"); // "browser" or "vr"
+  const [viewMode, setViewMode] = useState<DisplayMode>("vr");
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
@@ -28,7 +30,7 @@ function App() {
     // Update URL parameter with current UDP host value
     updateUrlParam('udpHost', udpHost);
     
-    let tempViewMode = 'vr';
+    let tempViewMode: DisplayMode = 'vr';
     if (!navigator.xr) {
       tempViewMode = 'browser';
     }
@@ -184,9 +186,6 @@ function App() {
               <VideoScreenWeb
                 setStreams={setStreams}
                 setIsConnected={() => { }}
-                setLocalStream={() => { }}
-                vector={{ x: 0, y: 0, z: 0 }}
-                call={true}
                 url={url}
                 signalingUrl="10.33.13.62"
                 activeCameras={activeCameras}
