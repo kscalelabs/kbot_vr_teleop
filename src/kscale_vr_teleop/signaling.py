@@ -173,7 +173,8 @@ async def handler(websocket):
         robot_id = data.get("robot_id")
         udp_host = data.get("udp_host")
 
-        udp_sock.sendto(json.dumps({'ip': ip}).encode("utf-8"), (udp_host, 10003))
+        if type(udp_host) == str:
+            udp_sock.sendto(json.dumps({'ip': ip}).encode("utf-8"), (udp_host, 10002))
         # if not robot_id:
         #     await websocket.send(json.dumps({"error": "robot_id required"}))
             # return

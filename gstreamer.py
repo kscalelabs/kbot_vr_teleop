@@ -19,6 +19,7 @@ Gst.init(None)
 logger = logging.getLogger(__name__)
 
 def get_host_ip():
+    print("Waiting for host to connect")
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_sock.setblocking(False)
     udp_sock.bind(('0.0.0.0', 10002))
@@ -27,12 +28,14 @@ def get_host_ip():
         try:
             data, _ = udp_sock.recvfrom(1024)  # Buffer size 1024 bytes
             payload = json.loads(data.decode('utf-8'))
-            
+
             if 'ip' in payload:
+                print(payload)
+                time.sleep(1)
                 return payload['ip']
 
         except socket.error:
-            return False  # No packet available
+            pass
         except json.JSONDecodeError:
             logger.error("Invalid JSON in UDP packet")
         except Exception as e:
