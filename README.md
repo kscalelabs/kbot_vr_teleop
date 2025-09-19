@@ -13,19 +13,22 @@ Setup:
     - See further down this document for a guide on how to set this up
   - CSI Cameras plugged in
   - Gstreamer installed and `gi` python package installed, with webrtc plugins
+  - Environment variables
+    - `export IMU_DEV=/tmp/imu_emulator_in`
+    - CAN_INTERFACES needs to be set in the right order (e.g. `CAN_INTERFACES=can3,can1`) depending on which CAN ports the left and right arm busses are plugged into (use [robstride tool](https://github.com/kscalelabs/robstride) to figure this out)
 
 Commands to run:
   - `gstreamer.py`
   - `deploy_from_queue`
+  - `cd ~/firmware/scripts/usb && sudo ./start.sh` (depends on where you have the [firmware repo](https://github.com/kscalelabs/firmware/commit/b89560d7fa3d254c0eee6f6acfbf93f9d12f8309) cloned)
 
-### Intermediate computer (can also be run on the K-Bot, but the raspberry pi gets way too slow when running both software encoding for the video stream and the invserse kinematics)
+### Intermediate computer (can also be run on the K-Bot, but the raspberry pi struggles to encode the video stream while doing invserse kinematics and running a policy). Running the signaling server on the pi would also need a refactor of the https proxy logic since it assumes the web server and signaling server use the same IP.
+
 Setup:
   - Install `uv`
   - Clone this repo
   - Install `node`
   - cd into `webxrtest` and `npm i`
-  - Change hard-coded IP address of the robot throughout the codebase
-  - In a separate terminal, `uv run src/kscale_vr_teleop/signaling.py`
 
 Commands to run:
   - cd into `webxrtest` and `npm run start-https`
@@ -33,7 +36,11 @@ Commands to run:
 
 ### In the headset
   - Connect to the ip of the intermediate computer, port 8443, with https (e.g. `https://10.33.13.41:8443`)
-  - Click connect and then start VR button that pops up
+  - Enter the IP address of the K-Bot.
+  - Press Connect. This will start an immersive VR session with hand-tracking.
+  - Handtracking will work if both hands are found, otherwise controller positions are used. Using a controller, "X" pauses/resumes sending commands to the robot and the back triggers close the grippers.
+
+
 
 
 ## Details for K-Bot Setup
