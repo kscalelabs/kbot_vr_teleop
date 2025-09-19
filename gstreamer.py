@@ -4,6 +4,9 @@ import ssl
 import websockets
 import os
 import argparse
+import socket
+import time
+import logging
 
 import gi
 gi.require_version('Gst', '1.0')
@@ -13,9 +16,35 @@ from gi.repository import Gst, GstWebRTC, GstSdp, GLib
 
 Gst.init(None)
 
+logger = logging.getLogger(__name__)
+
+def get_host_ip():
+    print("Waiting for host to connect")
+    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    udp_sock.setblocking(False)
+    udp_sock.bind(('0.0.0.0', 10002))
+
+    while True:
+        try:
+            data, _ = udp_sock.recvfrom(1024)  # Buffer size 1024 bytes
+            payload = json.loads(data.decode('utf-8'))
+
+            if 'ip' in payload:
+                print(payload)
+                time.sleep(1)
+                return payload['ip']
+
+        except socket.error:
+            pass
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in UDP packet")
+        except Exception as e:
+            logger.error(f"Error processing UDP packet: {e}")
+        time.sleep(0.5)
+
 # WebSocket configuration
 # HOST_URL= "wss://c47174bc6ce1.ngrok-free.app"
-ip = os.environ.get("HOST_IP", "10.33.13.51")
+ip = get_host_ip()
 HOST_URL= f"ws://{ip}:8013"
 PIPELINE_DESC = '''
 webrtcbin name=sendrecv bundle-policy=max-bundle stun-server=stun://stun.l.google.com:19302
@@ -203,6 +232,7 @@ class WebRTCClient:
         finally:
             if self.pipe:
                 self.pipe.set_state(Gst.State.NULL)
+
 
 async def main():
     # Parse command line arguments

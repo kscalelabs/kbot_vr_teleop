@@ -134,7 +134,33 @@ async def handle_teleop(websocket, robot_id: str):
     # except Exception as e:
     #     logger.error(f"Error in teleop handler for robot {robot_id}: {e}")
 
+def get_ipv4_address():
+    """Get the local IPv4 address of this machine"""
+    try:
+        # Connect to a remote address (doesn't actually send data)
+        # This helps determine which local IP would be used for external connections
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+        return local_ip
+    except Exception as e:
+        return f"Error getting IP address: {e}"
+
 async def handler(websocket):
+    ip = get_ipv4_address()
+    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    udp_sock.setblocking(False)
+
+    # Increase send buffer size to handle bursts
+    udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # 64KB
+
+    # Set socket priority (if supported)
+    try:
+        udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)  # High priority
+    except:
+        pass  # Not all systems support this
+    # Enable broadcast (useful for some network setups)
+    udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     """Route connections based on role"""
     try:
         global tracking_handler
@@ -146,6 +172,9 @@ async def handler(websocket):
         role = data.get("role")
         robot_id = data.get("robot_id")
         udp_host = data.get("udp_host")
+
+        if type(udp_host) == str:
+            udp_sock.sendto(json.dumps({'ip': ip}).encode("utf-8"), (udp_host, 10002))
         # if not robot_id:
         #     await websocket.send(json.dumps({"error": "robot_id required"}))
             # return
