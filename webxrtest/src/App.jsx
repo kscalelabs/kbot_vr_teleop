@@ -4,15 +4,30 @@ import SideBySideVideo from './SideBySideVideo.tsx';
 import VRViewer from './URDFViewer.tsx';
 
 function App() {
+  // Utility functions for URL parameters
+  const getUrlParam = (name, defaultValue) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name) || defaultValue;
+  };
+
+  const updateUrlParam = (name, value) => {
+    const url = new URL(window.location);
+    url.searchParams.set(name, value);
+    window.history.replaceState({}, '', url);
+  };
+
   const portString = window.location.port ? `:${window.location.port}` : '';
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
   const [viewMode, setViewMode] = useState("vr"); // "browser" or "vr"
   const [isConnected, setIsConnected] = useState(false);
   const [streams, setStreams] = useState([]); // Array of MediaStreams
   const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
-  const [udpHost, setUdpHost] = useState("10.33.13.62");
+  const [udpHost, setUdpHost] = useState(getUrlParam('udpHost', '10.33.13.62'));
 
   const handleConnect = async () => {
+    // Update URL parameter with current UDP host value
+    updateUrlParam('udpHost', udpHost);
+    
     let tempViewMode = 'vr';
     if (!navigator.xr) {
       tempViewMode = 'browser';
