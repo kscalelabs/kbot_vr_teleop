@@ -1,6 +1,6 @@
 # K-Scale VR Teleoperation
 
-This repo lets you control the upper body of K-Bot with a VR headset, using either the controllers or hand tracking.
+This repo lets you control the upper body of K-Bot with a VR headset, using either the controllers or hand tracking. This document provides information on how to set up and run the repo. For more subjective details about the project, check `notes.md`
 
 ## Setup
 Requirements to set up:
