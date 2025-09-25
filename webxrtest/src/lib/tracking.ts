@@ -118,7 +118,7 @@ function handleControllerTracking(frame, referenceSpace): trackingResult {
         // Offset position 0.5 units opposite controller forward direction
         const pos = controllerPose.transform.position;
         const ori = controllerPose.transform.orientation;
-        const position = shiftTargetWithOrientation(pos, ori, 0.1);
+        const position = shiftTargetWithOrientation(pos, ori, 0.09);
         
         const orientation = [
           ori.x,

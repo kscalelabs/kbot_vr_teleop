@@ -3,7 +3,7 @@ from kscale_vr_teleop._assets import ASSETS_DIR
 from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop.command_conn import Commander16
-from kscale_vr_teleop.udp_conn import UDPHandler
+# from kscale_vr_teleop.udp_conn import UDPHandler
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
 import rerun as rr
 from line_profiler import profile
@@ -36,7 +36,7 @@ class TeleopCore:
         self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
 
         self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
-        self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
+        # self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
         self.log_joint_angles(np.zeros(5), np.zeros(5))
 
         # Gripper values from controller inputs (0.0 to 1.0)
@@ -204,8 +204,8 @@ class TeleopCore:
         '''
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
-    def send_kos_commands(self, right_arm: list, left_arm: list):
-        '''
-        Takes input in the same format as compute_joint_angles arm output
-        '''
-        self.kos_command_handler._send_udp(right_arm, left_arm)
+    # def send_kos_commands(self, right_arm: list, left_arm: list):
+    #     '''
+    #     Takes input in the same format as compute_joint_angles arm output
+    #     '''
+    #     self.kos_command_handler._send_udp(right_arm, left_arm)
