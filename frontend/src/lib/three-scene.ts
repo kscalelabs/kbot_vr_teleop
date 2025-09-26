@@ -28,7 +28,7 @@ export type sceneState = {
     statusCanvas: null,
     statusTexture: null,
     robot: null,
-    pauseCommands: false,
+    pauseCommands: true,
     previousButtonStates: new Map<string, boolean>(),
     lastLeftColorRef: -1,
     lastRightColorRef: -1
@@ -136,12 +136,17 @@ export type sceneState = {
         }
         
         function createVideoPlaneMesh(videoTexture: THREE.VideoTexture | null) {
-          // Create video plane geometry matching video aspect ratio (1280x1080)
-          const videoAspectRatio = 1280 / 1080; // 1.185
-          const height = 3.0;
-          const width = height * videoAspectRatio; // Maintain video aspect ratio
+          // Create video plane geometry that matches the actual video aspect ratio
+          const defaultVideoWidth = 1920;  // fallback to expected stream size
+          const defaultVideoHeight = 1080;  // fallback to expected stream size
+          const actualVideoWidth = (videoRef.current && (videoRef.current as HTMLVideoElement).videoWidth) || defaultVideoWidth;
+          const actualVideoHeight = (videoRef.current && (videoRef.current as HTMLVideoElement).videoHeight) || defaultVideoHeight;
+          const videoAspectRatio = actualVideoWidth / actualVideoHeight;
+
+          const videoHeight = 6.0;
+          const videoWidth = videoHeight * videoAspectRatio; // Maintain video aspect ratio
           const segments = 256;
-          const planeGeometry = new THREE.PlaneGeometry(width, height, segments, segments);
+          const planeGeometry = new THREE.PlaneGeometry(videoWidth, videoHeight, segments, segments);
 
           // Create material - use video texture if available, otherwise orange
           const planeMaterial = new THREE.MeshBasicMaterial({
@@ -157,9 +162,7 @@ export type sceneState = {
           sceneState.videoPlaneMesh = videoPlaneMesh;
           sceneState.scene.add(videoPlaneMesh);
 
-          // Create status plane beneath the video plane
-          const videoHeight = 2.0;
-          const videoWidth = videoHeight * videoAspectRatio;
+          // Create status plane beneath the video plane (use same computed width/height)
 
           // Status plane: same width, 1/6th height
           const statusHeight = videoHeight / 6;
@@ -210,6 +213,33 @@ export type sceneState = {
           material.map = videoTexture;
           material.color.setHex(0xffffff); // White when video is available
           material.needsUpdate = true;
+
+          // Also ensure the plane geometry matches the ACTUAL video aspect ratio
+          const actualVideoWidth = (videoRef.current as HTMLVideoElement).videoWidth || 1296;
+          const actualVideoHeight = (videoRef.current as HTMLVideoElement).videoHeight || 1080;
+          const ar = actualVideoWidth / actualVideoHeight;
+          const desiredHeight = 3.0;
+          const desiredWidth = desiredHeight * ar;
+
+          // Replace geometry to avoid any prior mismatch/cropping
+          const segments = 256;
+          const newGeom = new THREE.PlaneGeometry(desiredWidth, desiredHeight, segments, segments);
+          if (sceneState.videoPlaneMesh.geometry) {
+            sceneState.videoPlaneMesh.geometry.dispose();
+          }
+          sceneState.videoPlaneMesh.geometry = newGeom;
+
+          // If we have a status plane, update its size/position to match new video size
+          if (sceneState.statusPlaneMesh) {
+            const statusHeight = desiredHeight / 6;
+            const statusWidth = desiredWidth;
+            const statusGeom = new THREE.PlaneGeometry(statusWidth, statusHeight);
+            if (sceneState.statusPlaneMesh.geometry) {
+              sceneState.statusPlaneMesh.geometry.dispose();
+            }
+            sceneState.statusPlaneMesh.geometry = statusGeom;
+            sceneState.statusPlaneMesh.position.set(0, -desiredHeight / 2 - statusHeight / 2 - 0.1, -2);
+          }
           
           console.log('Video texture updated successfully');
         } else {

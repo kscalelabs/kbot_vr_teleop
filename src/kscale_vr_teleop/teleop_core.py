@@ -1,7 +1,4 @@
 import numpy as np
-from kscale_vr_teleop._assets import ASSETS_DIR
-from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
-from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop.command_conn import Commander16
 # from kscale_vr_teleop.udp_conn import UDPHandler
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
@@ -10,7 +7,7 @@ from line_profiler import profile
 import json
 
 class TeleopCore:
-    def __init__(self, websocket, udp_host, udp_port):
+    def __init__(self, websocket, udp_host, udp_port, urdf_logger, ik_solver):
         self.websocket = websocket
         self.head_matrix = np.eye(4, dtype=np.float32)
         self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
@@ -28,9 +25,8 @@ class TeleopCore:
         self.left_wrist_pose[:3,:3] = default_wrist_rotation
         self.right_wrist_pose[:3,:3] = default_wrist_rotation
 
-        self.urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
-        self.urdf_logger = URDFLogger(self.urdf_path)
-        self.ik_solver = RobotInverseKinematics(self.urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
+        self.urdf_logger = urdf_logger
+        self.ik_solver = ik_solver
 
         self.base_to_head_transform = np.eye(4)
         self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
@@ -197,11 +193,28 @@ class TeleopCore:
                 left_arm_joints.tolist() + [left_gripper_joint],
                 right_finger_angles,
                 left_finger_angles)
-    
-    def send_kinfer_commands(self, right_arm: list, left_arm: list):
+    async def compute_and_send_joints(self):
+        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = await self.compute_joint_angles()
+        self.log_joint_angles(right_arm_joints, left_arm_joints)
+        if(right_arm_joints[0] < 1):
+            self._send_kinfer_commands(right_arm_joints, left_arm_joints)
+
+    def _send_kinfer_commands(self, right_arm: list, left_arm: list):
         '''
         Takes input in the same format as compute_joint_angles arm output
         '''
+        # Log commands to separate files
+        import time
+        timestamp = time.time()
+        
+        # Log right arm commands
+        with open('right_arm_commands.log', 'a') as f:
+            f.write(f"{timestamp},{','.join(map(str, right_arm))}\n")
+        
+        # Log left arm commands
+        with open('left_arm_commands.log', 'a') as f:
+            f.write(f"{timestamp},{','.join(map(str, left_arm))}\n")
+        
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):

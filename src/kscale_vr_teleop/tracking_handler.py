@@ -49,15 +49,19 @@ else:
         print("Rerun visualization disabled - missing dependencies")
 
 class TrackingHandler:
-    def __init__(self, websocket, udp_host, udp_port=10000):
+    def __init__(self, websocket, udp_host, urdf_logger, ik_solver=None, udp_port=10000):
         self.udp_host = udp_host
         self.udp_port = udp_port
 
-        self.teleop_core = TeleopCore(websocket, udp_host, udp_port)
+        self.teleop_core = TeleopCore(websocket, udp_host, udp_port, urdf_logger, ik_solver)
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
 
 
     async def handle_hand_tracking(self,event):
+        '''
+        Calls the correct function to update controllers or hands based on the structure of the event.
+        Calls compute_and_send_joints
+        '''
         if event.get('left') != None:
             left_mat_raw = event['left']
             if isinstance(left_mat_raw, dict):
@@ -92,7 +96,6 @@ class TrackingHandler:
                 finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
                 self.teleop_core.update_left_hand(wrist_mat, finger_poses)
 
-        # Right hand
         if event.get('right') != None:
             right_mat_raw = event['right']
             if isinstance(right_mat_raw, dict):
@@ -129,10 +132,7 @@ class TrackingHandler:
                 finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
                 self.teleop_core.update_right_hand(wrist_mat, finger_poses)
 
-        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = await self.teleop_core.compute_joint_angles()
-        self.teleop_core.log_joint_angles(right_arm_joints, left_arm_joints)
-
-        self.teleop_core.send_kinfer_commands(right_arm_joints, left_arm_joints)
+        await self.teleop_core.compute_and_send_joints()
 
         # Send finger commands via new UDP server
-        self.finger_server.send_finger_commands(right_finger_angles, left_finger_angles)
+        # self.finger_server.send_finger_commands(right_finger_angles, left_finger_angles)

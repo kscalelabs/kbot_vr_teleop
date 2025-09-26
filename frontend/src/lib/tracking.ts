@@ -166,7 +166,10 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
   if(respone.handPositions.left == null || respone.handPositions.right == null){
     respone = handleControllerTracking(frame, referenceSpace);
   }
-  if (!pauseCommands && wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(respone.payload).length > 0) {
+  if(pauseCommands){
+    return respone;
+  }
+  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(respone.payload).length > 0) {
     try {
       wsRef.current.send(JSON.stringify(respone.payload));
     } catch (error) {
