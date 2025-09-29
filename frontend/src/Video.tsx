@@ -9,16 +9,16 @@ interface VideoProps {
   setStreams: (streams: MediaStream[]) => void;
   setIsConnected: (isConnected: boolean) => void;
   url: string;
-  signalingUrl: string;
   activeCameras: number[];
+  robotIp: string;
 }
 
 export default function VideoScreenWeb({
   setStreams,
   setIsConnected,
   url,
-  signalingUrl,
   activeCameras,
+  robotIp,
 }: VideoProps) {
   const pc = useRef<RTCPeerConnection | null>(null);
   const ws = useRef<WebSocket | null>(null);
@@ -68,7 +68,8 @@ export default function VideoScreenWeb({
       setIsConnected(true);
       ws.current?.send(JSON.stringify({
         role: "app",
-        robot_id: "box"
+        robot_id: "box",
+        robot_ip: robotIp,
       }));
     };
 
@@ -108,7 +109,7 @@ export default function VideoScreenWeb({
 
     ws.current.onerror = () => setIsConnected(false);
     ws.current.onclose = () => setIsConnected(false);
-  }, [setIsConnected, signalingUrl]);
+  }, [setIsConnected]);
 
   const cleanup = useCallback(() => {
     console.log('Cleaning up WebRTC connection');

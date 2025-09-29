@@ -1,5 +1,6 @@
 import json
 import socket
+import math
 from dataclasses import dataclass
 import numpy as np
 
@@ -75,15 +76,28 @@ class Commander16:
         self.cmds.LElbowRoll = float(left_arm_angles[3])
         self.cmds.LWristRoll = float(left_arm_angles[4])
         if len(left_arm_angles) > 5:
-            self.cmds.LWristGripper = float(left_arm_angles[5])
+            # Map 0-1 input to -25° to +25° radians with left gripper offset
+            input_val = float(left_arm_angles[5])
+            gripper_range_min = math.radians(-25)   # radians (fully open)
+            gripper_range_max = math.radians(25.0)  # radians (fully closed)
+            offset = math.radians(-8)  # Left gripper offset
+            mapped_value = gripper_range_max - input_val * (gripper_range_max - gripper_range_min)
+            self.cmds.LWristGripper = mapped_value + offset
+            
         self.cmds.RShoulderPitch = float(right_arm_angles[0])
         self.cmds.RShoulderRoll = float(right_arm_angles[1])
         self.cmds.RElbowPitch = float(right_arm_angles[2])
         self.cmds.RElbowRoll = float(right_arm_angles[3])
         self.cmds.RWristRoll = float(right_arm_angles[4])
         if len(right_arm_angles) > 5:
-            self.cmds.RWristGripper = float(right_arm_angles[5])
-
+            # Map 0-1 input to -25° to +25° radians with right gripper offset
+            input_val = float(right_arm_angles[5])
+            gripper_range_min = math.radians(-25)   # radians (fully open)
+            gripper_range_max = math.radians(25.0)  # radians (fully closed)
+            offset = math.radians(-25)  # Right gripper offset
+            mapped_value = gripper_range_max - input_val * (gripper_range_max - gripper_range_min)
+            self.cmds.RWristGripper = mapped_value + offset
+            
         self.sock.sendto(self.cmds.to_msg(), (self.UDP_IP, self.UDP_PORT)) # This line takes a non-trivial amount of time (8e-4s on a *desktop*)
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import websockets
-import socket
 from typing import Optional
 import logging
 from kscale_vr_teleop.tracking_handler import TrackingHandler
@@ -21,7 +20,6 @@ class SimpleConnection:
     def __init__(self):
         self.app_ws: Optional[websockets.WebSocketServerProtocol] = None
         self.robot_ws: Optional[websockets.WebSocketServerProtocol] = None
-        self.robot_id: Optional[str] = None
     
     async def relay_robot_message(self, message: str):
         """Relay message from robot to app"""
@@ -45,10 +43,8 @@ class SimpleConnection:
 connection = SimpleConnection()
 connection_lock = asyncio.Lock()
 
-async def handle_robot(websocket, robot_id: str):
-    """Handle robot connection"""
-    logger.info(f"Robot {robot_id} connected")
-    
+async def handle_robot(websocket):
+    """Handle robot connection"""    
     async with connection_lock:
         # If there's already a robot connected, disconnect the old one
         if connection.robot_ws and connection.robot_ws != websocket:
@@ -59,7 +55,6 @@ async def handle_robot(websocket, robot_id: str):
                 pass
         
         connection.robot_ws = websocket
-        connection.robot_id = robot_id
         
         # If app is already connected, notify it that robot is available
         if connection.app_ws:
@@ -76,10 +71,10 @@ async def handle_robot(websocket, robot_id: str):
                 await connection.relay_robot_message(message)
                     
             except json.JSONDecodeError:
-                logger.error(f"Invalid JSON from robot {robot_id}")
+                logger.error(f"Invalid JSON from robot ")
                 
     except websockets.ConnectionClosed:
-        logger.info(f"Robot {robot_id} disconnected")
+        logger.info(f"Robot disconnected")
     finally:
         # Clean up robot connection
         async with connection_lock:
@@ -91,11 +86,10 @@ async def handle_robot(websocket, robot_id: str):
                         pass
                 logger.info("Cleaning up robot connection")
                 connection.robot_ws = None
-                connection.robot_id = None
 
-async def handle_app(websocket, robot_id: str):
+async def handle_app(websocket, robot_ip: str):
     """Handle app connection"""
-    logger.info(f"App requesting connection")
+    logger.info(f"App requesting connection to robot at {robot_ip}")
     
     async with connection_lock:
         # If there's already an app connected, disconnect the old one
@@ -108,15 +102,24 @@ async def handle_app(websocket, robot_id: str):
         
         connection.app_ws = websocket
         
-        # If robot is already connected, notify app immediately
-        if connection.robot_ws:
-            try:
-                await websocket.send(json.dumps({"type": "robot_available"}))
-                logger.info("App connected and robot is already available")
-            except:
-                logger.error("Failed to notify app of robot availability")
-        else:
-            logger.info("App connected, waiting for robot")
+        # Immediately connect to robot
+        try:
+            print(f"Connecting to robot at {robot_ip}:8765")
+            robot_ws = await websockets.connect(f"ws://{robot_ip}:8765")
+            connection.robot_ws = robot_ws
+            logger.info(f"Connected to robot at {robot_ip}:8765")
+            
+            # Start handling robot messages in background
+            asyncio.create_task(handle_robot(robot_ws))
+            
+            # Notify app that robot is available
+            await websocket.send(json.dumps({"type": "robot_available"}))
+            logger.info("Notified app that robot is available")
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to robot at {robot_ip}:8765: {e}")
+            await websocket.send(json.dumps({"type": "error", "error": f"Failed to connect to robot: {e}"}))
+            return
     
     try:
         async for message in websocket:
@@ -135,58 +138,32 @@ async def handle_app(websocket, robot_id: str):
                 if connection.robot_ws:
                     try:
                         await connection.robot_ws.send(json.dumps({"type": "connection_closed"}))
+                        await connection.robot_ws.close()
                     except:
                         pass
                 logger.info("Cleaning up app connection")
                 connection.app_ws = None
+                connection.robot_ws = None
 
-async def handle_teleop(websocket, robot_id: str):
+async def handle_teleop(websocket):
     """Handle teleop connection - forwards messages over UDP"""
     global tracking_handler
-    
     try:
         async for message in websocket:
             try:
                 # Parse the incoming message
                 data = json.loads(message)
-                await tracking_handler.handle_hand_tracking(data)
+                await tracking_handler.handle_tracking(data)
 
-                logger.debug(f"Forwarded teleop message to UDP: {robot_id}")
+                logger.debug(f"Forwarded teleop message to UDP ")
                 
             except json.JSONDecodeError:
-                logger.error(f"Invalid JSON from teleop client for robot {robot_id}")
+                logger.error(f"Invalid JSON from teleop client for robot")
                 
     except websockets.ConnectionClosed:
-        logger.info(f"Teleop client for robot {robot_id} disconnected")
-
-def get_ipv4_address():
-    """Get the local IPv4 address of this machine"""
-    try:
-        # Connect to a remote address (doesn't actually send data)
-        # This helps determine which local IP would be used for external connections
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            local_ip = s.getsockname()[0]
-        return local_ip
-    except Exception as e:
-        return f"Error getting IP address: {e}"
+        logger.info(f"Teleop client for robot disconnected")
 
 async def handler(websocket):
-    ip = get_ipv4_address()
-    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp_sock.setblocking(False)
-
-    # Increase send buffer size to handle bursts
-    udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 65536)  # 64KB
-
-    # Set socket priority (if supported)
-    try:
-        udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_PRIORITY, 6)  # High priority
-    except:
-        pass  # Not all systems support this
-    # Enable broadcast (useful for some network setups)
-    udp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    
     """Route connections based on role"""
     try:
         global tracking_handler
@@ -196,21 +173,13 @@ async def handler(websocket):
         data = json.loads(initial_msg)
         logger.info(f"Initial message: {data}")
         role = data.get("role")
-        robot_id = data.get("robot_id")
-        udp_host = data.get("udp_host")
+        robot_ip = data.get("robot_ip")
 
-        # Send server IP to client via UDP if udp_host is provided
-        if type(udp_host) == str:
-            udp_sock.sendto(json.dumps({'ip': ip}).encode("utf-8"), (udp_host, 10002))
-            logger.info(f"Sent server IP {ip} to {udp_host}:10002")
-
-        if role == "robot":
-            await handle_robot(websocket, robot_id)
-        elif role == "app":
-            await handle_app(websocket, robot_id)
+        if role == "app":
+            await handle_app(websocket, robot_ip)
         elif role == "teleop":
-            tracking_handler = TrackingHandler(websocket, udp_host=udp_host, urdf_logger=urdf_logger, ik_solver=ik_solver)
-            await handle_teleop(websocket, robot_id)
+            tracking_handler = TrackingHandler(websocket, udp_host=robot_ip, urdf_logger=urdf_logger, ik_solver=ik_solver)
+            await handle_teleop(websocket)
         else:
             await websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
             

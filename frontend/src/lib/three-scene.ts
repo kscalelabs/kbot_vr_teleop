@@ -143,7 +143,7 @@ export type sceneState = {
           const actualVideoHeight = (videoRef.current && (videoRef.current as HTMLVideoElement).videoHeight) || defaultVideoHeight;
           const videoAspectRatio = actualVideoWidth / actualVideoHeight;
 
-          const videoHeight = 6.0;
+          const videoHeight = 3.0;
           const videoWidth = videoHeight * videoAspectRatio; // Maintain video aspect ratio
           const segments = 256;
           const planeGeometry = new THREE.PlaneGeometry(videoWidth, videoHeight, segments, segments);
@@ -213,33 +213,6 @@ export type sceneState = {
           material.map = videoTexture;
           material.color.setHex(0xffffff); // White when video is available
           material.needsUpdate = true;
-
-          // Also ensure the plane geometry matches the ACTUAL video aspect ratio
-          const actualVideoWidth = (videoRef.current as HTMLVideoElement).videoWidth || 1296;
-          const actualVideoHeight = (videoRef.current as HTMLVideoElement).videoHeight || 1080;
-          const ar = actualVideoWidth / actualVideoHeight;
-          const desiredHeight = 3.0;
-          const desiredWidth = desiredHeight * ar;
-
-          // Replace geometry to avoid any prior mismatch/cropping
-          const segments = 256;
-          const newGeom = new THREE.PlaneGeometry(desiredWidth, desiredHeight, segments, segments);
-          if (sceneState.videoPlaneMesh.geometry) {
-            sceneState.videoPlaneMesh.geometry.dispose();
-          }
-          sceneState.videoPlaneMesh.geometry = newGeom;
-
-          // If we have a status plane, update its size/position to match new video size
-          if (sceneState.statusPlaneMesh) {
-            const statusHeight = desiredHeight / 6;
-            const statusWidth = desiredWidth;
-            const statusGeom = new THREE.PlaneGeometry(statusWidth, statusHeight);
-            if (sceneState.statusPlaneMesh.geometry) {
-              sceneState.statusPlaneMesh.geometry.dispose();
-            }
-            sceneState.statusPlaneMesh.geometry = statusGeom;
-            sceneState.statusPlaneMesh.position.set(0, -desiredHeight / 2 - statusHeight / 2 - 0.1, -2);
-          }
           
           console.log('Video texture updated successfully');
         } else {

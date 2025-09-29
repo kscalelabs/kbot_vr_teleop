@@ -55,82 +55,67 @@ class TrackingHandler:
 
         self.teleop_core = TeleopCore(websocket, udp_host, udp_port, urdf_logger, ik_solver)
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
+    
+    def _handle_controller_tracking(self, controller_data, side):
+        '''
+        Handles controller tracking for either left or right side
+        '''
+         #controller tracking
+        controller = controller_data
+        direction = -1 if side == 'right' else 1
+        # Extract position and orientation
+        position = np.array(controller['position'], dtype=np.float32)
+        orientation = np.array(controller['orientation'], dtype=np.float32)  # [qx, qy, qz, qw]
+        
+        # Convert quaternion to rotation matrix
+        qx, qy, qz, qw = orientation
+        rotation = Rotation.from_euler('z', 90 * direction, degrees=True)
+        rotation_matrix = (Rotation.from_quat([qx, qy, qz, qw], scalar_first=False)*rotation).as_matrix()
 
+        # Create 4x4 transform matrix
+        controller_matrix = np.eye(4, dtype=np.float32)
+        controller_matrix[:3, :3] = rotation_matrix
+        controller_matrix[:3, 3] = position
+        
+        # Apply frame transformation
+        controller_pose = kbot_vuer_to_urdf_frame @ controller_matrix
+        controller_pose[:3, 3] -= self.teleop_core.head_matrix[:3, 3]
+        
+        gripper_value = controller.get('trigger', 0.0)
+        # Update controller state
+        if side == 'left':
+            self.teleop_core.update_left_controller(controller_pose, gripper_value)
+        else:
+            self.teleop_core.update_right_controller(controller_pose, gripper_value)
 
-    async def handle_hand_tracking(self,event):
+    def _handle_hand_tracking(self, hand_data, side):
+        hand_mat_numpy = np.array(hand_data, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
+        wrist_mat = kbot_vuer_to_urdf_frame @ hand_mat_numpy[0]
+        finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(hand_mat_numpy[0]) @ hand_mat_numpy[1:].T).T
+        
+        if side == 'left':
+            self.teleop_core.update_left_hand(wrist_mat, finger_poses)
+        else:
+            self.teleop_core.update_right_hand(wrist_mat, finger_poses)
+
+    async def handle_tracking(self,event):
         '''
         Calls the correct function to update controllers or hands based on the structure of the event.
-        Calls compute_and_send_joints
+        Finally calls compute_and_send_joints
         '''
         if event.get('left') != None:
             left_mat_raw = event['left']
             if isinstance(left_mat_raw, dict):
-                left_controller = left_mat_raw
-                left_controller = event['left']
-                
-                # Extract position and orientation
-                position = np.array(left_controller['position'], dtype=np.float32)
-                orientation = np.array(left_controller['orientation'], dtype=np.float32)  # [qx, qy, qz, qw]
-                
-                # Convert quaternion to rotation matrix
-                qx, qy, qz, qw = orientation
-                left_rotation = Rotation.from_euler('z', 90, degrees=True)
-                rotation_matrix = (Rotation.from_quat([qx, qy, qz, qw], scalar_first=False)*left_rotation).as_matrix()
-
-                # Create 4x4 transform matrix
-                left_controller_matrix = np.eye(4, dtype=np.float32)
-                left_controller_matrix[:3, :3] = rotation_matrix
-                left_controller_matrix[:3, 3] = position
-                
-                # Apply frame transformation
-                left_controller_pose = kbot_vuer_to_urdf_frame @ left_controller_matrix
-                left_controller_pose[:3, 3] -= self.teleop_core.head_matrix[:3, 3]
-                
-                # Get gripper value from trigger (prefer trigger over grip for now)
-                gripper_value = left_controller.get('trigger', 0.0)
-                # Update controller state
-                self.teleop_core.update_left_controller(left_controller_pose, gripper_value)
+                self._handle_controller_tracking(left_mat_raw, 'left')
             else:
-                left_mat_numpy = np.array(left_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
-                wrist_mat = kbot_vuer_to_urdf_frame @ left_mat_numpy[0]
-                finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(left_mat_numpy[0]) @ left_mat_numpy[1:].T).T
-                self.teleop_core.update_left_hand(wrist_mat, finger_poses)
+                self._handle_hand_tracking(left_mat_raw, 'left')
 
         if event.get('right') != None:
             right_mat_raw = event['right']
             if isinstance(right_mat_raw, dict):
-                right_controller = right_mat_raw
-                right_controller = event['right']
-                
-                # Extract position and orientation
-                position = np.array(right_controller['position'], dtype=np.float32)
-                orientation = np.array(right_controller['orientation'], dtype=np.float32)  # [qx, qy, qz, qw]
-                if (len(orientation) == 0 or len(position) == 0 ):
-                    return
-                # Convert quaternion to rotation matrix
-                qx, qy, qz, qw = orientation
-                right_rotation = Rotation.from_euler('z', -90, degrees=True)
-                rotation_matrix = (Rotation.from_quat([qx, qy, qz, qw], scalar_first=False)*right_rotation).as_matrix()
-                
-                # Create 4x4 transform matrix
-                right_controller_matrix = np.eye(4, dtype=np.float32)
-                right_controller_matrix[:3, :3] = rotation_matrix
-                right_controller_matrix[:3, 3] = position
-                
-                # Apply frame transformation
-                right_controller_pose = kbot_vuer_to_urdf_frame @ right_controller_matrix
-                right_controller_pose[:3, 3] -= self.teleop_core.head_matrix[:3, 3]
-                
-                # Get gripper value from trigger (prefer trigger over grip for now)
-                gripper_value = right_controller.get('trigger', 0.0)
-                
-                # Update controller state
-                self.teleop_core.update_right_controller(right_controller_pose, gripper_value)
+                self._handle_controller_tracking(right_mat_raw, 'right')
             else:
-                right_mat_numpy = np.array(right_mat_raw, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
-                wrist_mat = kbot_vuer_to_urdf_frame @ right_mat_numpy[0]
-                finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(right_mat_numpy[0]) @ right_mat_numpy[1:].T).T
-                self.teleop_core.update_right_hand(wrist_mat, finger_poses)
+                self._handle_hand_tracking(right_mat_raw, 'right')
 
         await self.teleop_core.compute_and_send_joints()
 

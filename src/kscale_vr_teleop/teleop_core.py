@@ -92,8 +92,8 @@ class TeleopCore:
     
     def _compute_gripper_from_controllers(self):
         # Placeholder: map controller trigger/grip values to gripper joint positions
-        right_gripper_joint = 0.068 * (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
-        left_gripper_joint = 0.068 * (1.0 - self.left_gripper_value)
+        right_gripper_joint =  (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
+        left_gripper_joint = (1.0 - self.left_gripper_value)
         return right_gripper_joint, left_gripper_joint
 
     @profile
@@ -188,7 +188,7 @@ class TeleopCore:
             }
         }
         await self.websocket.send(json.dumps(payload))
-
+        print("right_gripper_joint", right_gripper_joint)
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
                 right_finger_angles,
@@ -203,18 +203,6 @@ class TeleopCore:
         '''
         Takes input in the same format as compute_joint_angles arm output
         '''
-        # Log commands to separate files
-        import time
-        timestamp = time.time()
-        
-        # Log right arm commands
-        with open('right_arm_commands.log', 'a') as f:
-            f.write(f"{timestamp},{','.join(map(str, right_arm))}\n")
-        
-        # Log left arm commands
-        with open('left_arm_commands.log', 'a') as f:
-            f.write(f"{timestamp},{','.join(map(str, left_arm))}\n")
-        
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):

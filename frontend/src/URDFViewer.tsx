@@ -251,7 +251,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
         webSocket.onopen = () => {
           webSocket.send(JSON.stringify({
             role: "teleop",
-            udp_host: udpHost,
+            robot_ip: udpHost,
           }));
           wsRef.current = webSocket;
           updateStatus('Hand tracking WebSocket connected');
