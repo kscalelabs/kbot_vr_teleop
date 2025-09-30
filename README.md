@@ -28,10 +28,10 @@ Setup:
   - Install `uv`
   - Clone this repo
   - Install `node`
-  - cd into `webxrtest` and `npm i`
+  - cd into `frontend` and `npm i`
 
 Commands to run:
-  - cd into `webxrtest` and `npm run start-https`
+  - cd into `frontend` and `npm run start-https`
   - In a separate terminal, `uv run src/kscale_vr_teleop/signaling.py`
 
 ### In the headset

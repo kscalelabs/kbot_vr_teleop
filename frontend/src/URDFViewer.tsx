@@ -179,11 +179,12 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     const refSpace = renderer.xr.getReferenceSpace();
 
     // Setup WebXR session event listeners for camera positioning
-    renderer.xr.addEventListener('sessionstart', () => {
+    renderer.xr.addEventListener('sessionstart', async () => {
       // Position the VR camera at the desired location
       const vrCamera = renderer.xr.getCamera();
       vrCamera.position.set(0.107, 0.239, -5.000);
       vrCamera.lookAt(1, 0.239, -2.000); // Face towards positive X
+      await new Promise(resolve => setTimeout(resolve, 2000)); 
       updateStatus('VR camera positioned');
     });
 
