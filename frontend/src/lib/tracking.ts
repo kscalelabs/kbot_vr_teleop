@@ -18,7 +18,11 @@ export type trackingResult = {
   handPositions: localTargetLocation;
   payload: any;
 }
-
+/**
+  Function that shifts the controllers position in the opposite direction of its
+  orientation. Used to align the tip of the controller/end-effector with the
+  tip of the controllers for a better teleoperation experience.
+*/
 function shiftTargetWithOrientation(pos, ori, offset) {
 
   const rotateVectorByQuaternion = (v, q) => {
