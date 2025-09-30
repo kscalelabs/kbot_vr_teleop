@@ -1,6 +1,6 @@
 import URDFLoader from 'urdf-loader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { type sceneState } from './three-scene';
+import { SceneState } from './types';
 import * as THREE from 'three';
 
 const actuatorMapping = {
@@ -21,7 +21,7 @@ const actuatorMapping = {
   }
 
 // Load URDF robot after scene is initialized
-export const loadURDFRobot = async (sceneState: sceneState, updateStatus: (msg: string) => void) => {
+export const loadURDFRobot = async (sceneState: SceneState, updateStatus: (msg: string) => void) => {
     return new Promise((resolve, reject) => {
         if (sceneState.scene) {
             const loader = new URDFLoader();
@@ -73,7 +73,7 @@ export const loadURDFRobot = async (sceneState: sceneState, updateStatus: (msg: 
     });
 };
 
-export const updateURDF = (side: string, jointArray: number[], sceneState: sceneState) => {
+export const updateURDF = (side: string, jointArray: number[], sceneState: SceneState) => {
     if (!actuatorMapping[side]) {
       return;
     }

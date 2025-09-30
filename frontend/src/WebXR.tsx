@@ -1,10 +1,12 @@
 import { useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { handleTracking, handleControllerInput} from './lib/tracking';
-import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, 
-  createStatusCanvas, createVideoPlane, updateVideoTexture, getDistanceColor, updateMeshColor } from './lib/three-scene';
+import { cleanUpScene, 
+  createStatusCanvas, createVideoPlane, updateVideoTexture, 
+  getDistanceColor, updateMeshColor, initThreeScene } from './lib/three-scene';
 import { loadURDFRobot, updateURDF } from './lib/urdf';
 import { updateSTLPositions, loadSTLModelsWithFallback } from './lib/stl';
+import { SceneState, DEFAULT_SCENE_STATE, ForwardKinematicsMessage } from './lib/types';
 
 interface VRViewerProps {
   stream: MediaStream | null;
@@ -23,7 +25,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   const xrSessionRef = useRef<XRSession | null>(null);
 
   // Single state object for all scene-related refs
-  const sceneStateRef = useRef<sceneState>(DEFAULT_SCENE_STATE);
+  const sceneStateRef = useRef<SceneState>(DEFAULT_SCENE_STATE);
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -87,41 +89,13 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     }
   }
 
-  // Initialize Three.js scene
-  const initThreeScene = async () => {
-    return new Promise((resolve, reject) => {
-      try {
-        const scene = new THREE.Scene();
-
-        // Set a background color
-        scene.background = new THREE.Color(0x222222);
-
-        // Add basic lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        scene.add(ambientLight);
-
-        sceneStateRef.current.scene = scene;
-        resolve(true);
-      }
-      catch (error) {
-        updateStatus('Error initializing Three.js scene');
-        reject(new Error('no scene ref for initThreeScene'));
-      }
-    });
-  };
-
-
-  const updateStatus = (msg: string) => {
-    setStatus(msg);
-  };
-
   const startVR = async () => {
     // Prevent multiple sessions from starting
     if (xrSessionRef.current) {
       return;
     }
 
-    updateStatus('Starting VR URDF Viewer...');
+    setStatus('Starting VR URDF Viewer...');
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -141,22 +115,28 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
 
     sceneStateRef.current.renderer = renderer;
     setLoadCount(0);
-    updateStatus('Creating Three.js Dcene');
-    await initThreeScene();
-    setLoadCount(1);
-    updateStatus('Creating Video Plane');
+    setStatus('Creating Three.js Dcene');
+    try{
+      initThreeScene(sceneStateRef.current);
+      throw new Error('Failed to create Three.js scene');
+    }
+    catch (error) {
+      setStatus('Error initializing Three.js scene');
+    }
+    setLoadCount(progress => progress + 1);
+    setStatus('Creating Video Plane');
     await createVideoPlane(sceneStateRef.current, stream, videoRef);
-    setLoadCount(2);
-    updateStatus('Loading STL Models');
+    setLoadCount(progress => progress + 1);
+    setStatus('Loading STL Models');
     await loadSTLModelsWithFallback(sceneStateRef.current);
-    setLoadCount(3);
-    updateStatus('Loading Robot URDF');
-    await loadURDFRobot(sceneStateRef.current, updateStatus);
-    setLoadCount(4);
-    updateStatus('Setting up Tracking WebSocket');
+    setLoadCount(progress => progress + 1);
+    setStatus('Loading Robot URDF');
+    await loadURDFRobot(sceneStateRef.current, setStatus);
+    setLoadCount(progress => progress + 1);
+    setStatus('Setting up Tracking WebSocket');
     await setupTrackingWebSocket()
-    setLoadCount(5);
-    updateStatus('Requesting VR Session');
+    setLoadCount(progress => progress + 1);
+    setStatus('Requesting VR Session');
 
     // Request the XR session with appropriate features
     try {
@@ -168,11 +148,11 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
       // Hand the session to Three (this sets up XRWebGLLayer, etc.)
       setLoadCount(6);
       await renderer.xr.setSession(session);
-      updateStatus('XR Session Running ');
+      setStatus('XR Session Running ');
     }
     catch (err) {
       setLoadCount(6);
-      updateStatus('XR Session Running ');
+      setStatus('XR Session Running ');
       return
     }
     // Get the reference space from Three (do NOT call session.requestReferenceSpace)
@@ -185,11 +165,11 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
       vrCamera.position.set(0.107, 0.239, -5.000);
       vrCamera.lookAt(1, 0.239, -2.000); // Face towards positive X
       await new Promise(resolve => setTimeout(resolve, 2000)); 
-      updateStatus('VR camera positioned');
+      setStatus('VR camera positioned');
     });
 
     renderer.xr.addEventListener('sessionend', () => {
-      updateStatus('VR Session Ended');
+      setStatus('VR Session Ended');
     });
 
     // Create a stable camera (Three will substitute XR camera internally)
@@ -226,12 +206,12 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
             robot_ip: udpHost,
           }));
           wsRef.current = webSocket;
-          updateStatus('Hand tracking WebSocket connected');
+          setStatus('Hand tracking WebSocket connected');
           resolve(true);
         };
 
         webSocket.onmessage = (event) => {
-          const data = JSON.parse(event.data);
+          const data: ForwardKinematicsMessage= JSON.parse(event.data);
           if (data.type === "kinematics") {
             // Process left and right joint arrays
             if(data.joints) {
@@ -265,15 +245,15 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
 
         webSocket.onerror = (error) => {
           resolve(false);
-          updateStatus('Hand tracking WebSocket error');
+          setStatus('Hand tracking WebSocket error');
         };
 
         webSocket.onclose = () => {
-          updateStatus('Hand tracking WebSocket closed');
+          setStatus('Hand tracking WebSocket closed');
         };
 
       } catch (error) {
-        updateStatus('Failed to setup hand tracking WebSocket');
+        setStatus('Failed to setup hand tracking WebSocket');
       }
     });
   };

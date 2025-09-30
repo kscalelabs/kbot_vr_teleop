@@ -1,13 +1,12 @@
-import { type trackingResult } from './tracking';
 import * as THREE from 'three';
-import { type sceneState } from './three-scene';
+import { TrackingResult, SceneState } from './types';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 // Fixed local Z-axis offset for STL models (-90 degrees)
 const STL_Z_OFFSET = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
 
 // Update STL mesh positions based on hand tracking
-export const updateSTLPositions = (sceneState: sceneState, trackingResult: trackingResult) => {
+export const updateSTLPositions = (sceneState: SceneState, trackingResult: TrackingResult) => {
     if (!sceneState.scene) return;
     const handPositions = trackingResult.handPositions;
     const type = trackingResult.type;
@@ -58,7 +57,7 @@ export const updateSTLPositions = (sceneState: sceneState, trackingResult: track
 };
 
 // Load STL models for hand tracking
-export const loadSTLModels = async (sceneState: sceneState) => {
+export const loadSTLModels = async (sceneState: SceneState) => {
     return new Promise((resolve, reject) => {
         const loader = new STLLoader();
 
@@ -182,7 +181,7 @@ export const loadSTLModels = async (sceneState: sceneState) => {
 };
 
 // Alternative STL loading with error recovery
-export const loadSTLModelsWithFallback = async (sceneState: sceneState) => {
+export const loadSTLModelsWithFallback = async (sceneState: SceneState) => {
     try {
         console.log('Attempting to load STL models...');
         await loadSTLModels(sceneState);
