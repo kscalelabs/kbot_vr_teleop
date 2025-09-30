@@ -5,6 +5,7 @@ from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
 import rerun as rr
 from line_profiler import profile
 import json
+import time
 
 class TeleopCore:
     def __init__(self, websocket, udp_host, udp_port, urdf_logger, ik_solver):
@@ -32,15 +33,17 @@ class TeleopCore:
         self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
 
         self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
-        # self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
-        self.log_joint_angles(np.zeros(5), np.zeros(5))
 
         # Gripper values from controller inputs (0.0 to 1.0)
-        self.right_gripper_value = 0.0
-        self.left_gripper_value = 0.0
+        self.right_gripper_value = 1.0
+        self.left_gripper_value = 1.0
 
         self.use_fingers = False
-
+        self.converged = False
+        
+        # Track message timing to detect gaps (unpause)
+        self.last_message_time = None
+        
     def update_head(self, matrix: np.ndarray):
         self.head_matrix = matrix
 
@@ -78,6 +81,21 @@ class TeleopCore:
         ))
         self.use_fingers = False
 
+    def _check_message_timing(self):
+        """Check time between messages and reset converged flag if gap > 0.5s"""
+        current_time = time.time()
+        
+        if self.last_message_time is not None:
+            time_delta = current_time - self.last_message_time
+            
+            if time_delta >= 0.5:
+                print(f"Message gap detected: {time_delta:.3f}s - resetting converged flag")
+                self.converged = False
+            else:
+                print(f"Message received after {time_delta:.3f}s")
+        
+        self.last_message_time = current_time
+    
     def log_joint_angles(self, right_arm: list, left_arm: list):
         new_config = {k: right_arm[i] for i, k in enumerate(self.ik_solver.active_joints[:5])}
         new_config.update({k: left_arm[i] for i, k in enumerate(self.ik_solver.active_joints[5:])})
@@ -187,22 +205,40 @@ class TeleopCore:
                 "left": float(left_distance)
             }
         }
+        self._check_message_timing()
+        if (right_distance < 0.025 and left_distance < 0.025):
+            self.converged = True
+        if not self.converged:
+            return (None, None, None, None)
         await self.websocket.send(json.dumps(payload))
-        print("right_gripper_joint", right_gripper_joint)
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
                 right_finger_angles,
                 left_finger_angles)
+
     async def compute_and_send_joints(self):
         right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = await self.compute_joint_angles()
+        if right_arm_joints is None or left_arm_joints is None:
+            return
         self.log_joint_angles(right_arm_joints, left_arm_joints)
-        if(right_arm_joints[0] < 1):
-            self._send_kinfer_commands(right_arm_joints, left_arm_joints)
+        self._send_kinfer_commands(right_arm_joints, left_arm_joints)
 
     def _send_kinfer_commands(self, right_arm: list, left_arm: list):
         '''
         Takes input in the same format as compute_joint_angles arm output
         '''
+        # Log commands to separate files
+        import time
+        timestamp = time.time()
+        
+        # Log right arm commands
+        with open('right_arm_commands.log', 'a') as f:
+            f.write(f"{timestamp},{','.join(map(str, right_arm))}\n")
+        
+        # Log left arm commands
+        with open('left_arm_commands.log', 'a') as f:
+            f.write(f"{timestamp},{','.join(map(str, left_arm))}\n")
+        
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):

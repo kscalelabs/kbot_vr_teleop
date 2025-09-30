@@ -13,12 +13,19 @@ import rerun as rr
 os.environ["RERUN_EXECUTABLE"] = r"C:\Program Files\Rerun\rerun.exe"
 RERUN_AVAILABLE = True
 
+kbot_xr_to_urdf_frame = np.array([
+    [0,  0, -1,  0],  # Robot X-axis = -VR Z-axis (flip forward/back)
+    [-1, 0,  0,  0],  # Robot Y-axis = -VR X-axis (flip left/right)
+    [0,  1,  0,  0],  # Robot Z-axis = +VR Y-axis (keep up direction)
+    [0,  0,  0,  1]   # Homogeneous coordinate
+], dtype=np.float32)
 
-kbot_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
-kbot_vuer_to_urdf_frame[:3,:3] = np.array([[0,0,-1],[-1,0,0],[0,1,0]], dtype=np.float32)
-
-hand_vuer_to_urdf_frame = np.eye(4, dtype=np.float32)
-hand_vuer_to_urdf_frame[:3,:3] = np.array([[0,1,0],[0,0,1],[1,0,0]], dtype=np.float32)
+hand_xr_to_urdf_frame = np.array([
+    [0, 1, 0, 0],  # Rotate hand frame: X-axis → Y-axis
+    [0, 0, 1, 0],  # Rotate hand frame: Y-axis → Z-axis
+    [1, 0, 0, 0],  # Rotate hand frame: Z-axis → X-axis
+    [0, 0, 0, 1]   # Homogeneous coordinate
+], dtype=np.float32)
 
 # Rerun visualization setup
 VISUALIZE = bool(os.environ.get("VISUALIZE", True)) and RERUN_AVAILABLE
@@ -78,7 +85,7 @@ class TrackingHandler:
         controller_matrix[:3, 3] = position
         
         # Apply frame transformation
-        controller_pose = kbot_vuer_to_urdf_frame @ controller_matrix
+        controller_pose = kbot_xr_to_urdf_frame @ controller_matrix
         controller_pose[:3, 3] -= self.teleop_core.head_matrix[:3, 3]
         
         gripper_value = controller.get('trigger', 0.0)
@@ -90,8 +97,8 @@ class TrackingHandler:
 
     def _handle_hand_tracking(self, hand_data, side):
         hand_mat_numpy = np.array(hand_data, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
-        wrist_mat = kbot_vuer_to_urdf_frame @ hand_mat_numpy[0]
-        finger_poses = (hand_vuer_to_urdf_frame @ fast_mat_inv(hand_mat_numpy[0]) @ hand_mat_numpy[1:].T).T
+        wrist_mat = kbot_xr_to_urdf_frame @ hand_mat_numpy[0]
+        finger_poses = (hand_xr_to_urdf_frame @ fast_mat_inv(hand_mat_numpy[0]) @ hand_mat_numpy[1:].T).T
         
         if side == 'left':
             self.teleop_core.update_left_hand(wrist_mat, finger_poses)
@@ -103,19 +110,14 @@ class TrackingHandler:
         Calls the correct function to update controllers or hands based on the structure of the event.
         Finally calls compute_and_send_joints
         '''
-        if event.get('left') != None:
-            left_mat_raw = event['left']
-            if isinstance(left_mat_raw, dict):
-                self._handle_controller_tracking(left_mat_raw, 'left')
-            else:
-                self._handle_hand_tracking(left_mat_raw, 'left')
-
-        if event.get('right') != None:
-            right_mat_raw = event['right']
-            if isinstance(right_mat_raw, dict):
-                self._handle_controller_tracking(right_mat_raw, 'right')
-            else:
-                self._handle_hand_tracking(right_mat_raw, 'right')
+        props = ["left", "right"]
+        for prop in props:
+            if event.get(prop) != None:
+                mat_raw = event[prop]
+                if isinstance(mat_raw, dict):
+                    self._handle_controller_tracking(mat_raw, prop)
+                else:
+                    self._handle_hand_tracking(mat_raw, prop)
 
         await self.teleop_core.compute_and_send_joints()
 
