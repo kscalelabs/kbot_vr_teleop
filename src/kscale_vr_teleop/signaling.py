@@ -120,7 +120,6 @@ async def handle_app(websocket, robot_ip: str):
     try:
         async for message in websocket:
             try:
-                print("relaying app message", message)
                 await connection.relay_app_message(message)
                     
             except json.JSONDecodeError:
