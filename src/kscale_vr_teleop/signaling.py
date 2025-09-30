@@ -59,7 +59,7 @@ async def handle_robot(websocket):
         # If app is already connected, notify it that robot is available
         if connection.app_ws:
             try:
-                await connection.app_ws.send(json.dumps({"type": "robot_available"}))
+                await connection.app_ws.send(json.dumps({"type": "info", "payload": "robot_available"}))
                 logger.info("Notified app that robot is available")
             except:
                 logger.error("Failed to notify app of robot availability")
@@ -112,10 +112,6 @@ async def handle_app(websocket, robot_ip: str):
             # Start handling robot messages in background
             asyncio.create_task(handle_robot(robot_ws))
             
-            # Notify app that robot is available
-            await websocket.send(json.dumps({"type": "robot_available"}))
-            logger.info("Notified app that robot is available")
-            
         except Exception as e:
             logger.error(f"Failed to connect to robot at {robot_ip}:8765: {e}")
             await websocket.send(json.dumps({"type": "error", "error": f"Failed to connect to robot: {e}"}))
@@ -124,6 +120,7 @@ async def handle_app(websocket, robot_ip: str):
     try:
         async for message in websocket:
             try:
+                print("relaying app message", message)
                 await connection.relay_app_message(message)
                     
             except json.JSONDecodeError:
