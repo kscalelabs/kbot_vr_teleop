@@ -227,18 +227,7 @@ class TeleopCore:
         '''
         Takes input in the same format as compute_joint_angles arm output
         '''
-        # Log commands to separate files
-        import time
-        timestamp = time.time()
-        
-        # Log right arm commands
-        with open('right_arm_commands.log', 'a') as f:
-            f.write(f"{timestamp},{','.join(map(str, right_arm))}\n")
-        
-        # Log left arm commands
-        with open('left_arm_commands.log', 'a') as f:
-            f.write(f"{timestamp},{','.join(map(str, left_arm))}\n")
-        
+
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):
