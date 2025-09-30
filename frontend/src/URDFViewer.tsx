@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { handleTracking, handleControllerInput} from './lib/tracking';
 import { sceneState, DEFAULT_SCENE_STATE, cleanUpScene, 
   createStatusCanvas, createVideoPlane, updateVideoTexture, getDistanceColor, updateMeshColor } from './lib/three-scene';
-import { updateSTLPositions, loadSTLModelsWithFallback, loadURDFRobot, actuatorMapping } from './lib/urdf';
+import { loadURDFRobot, updateURDF } from './lib/urdf';
+import { updateSTLPositions, loadSTLModelsWithFallback } from './lib/stl';
 
 interface VRViewerProps {
   stream: MediaStream | null;
@@ -110,35 +111,6 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   };
 
 
-  const processJointArray = (side: string, jointArray: number[]) => {
-    if (!actuatorMapping[side]) {
-      console.error(`No mapping found for side: ${side}`);
-      return;
-    }
-
-    if (!sceneStateRef.current.robot) {
-      console.warn('Robot not loaded yet');
-      return;
-    }
-
-    const jointUpdates: { [key: string]: number } = {};
-
-    jointArray.forEach((angleInRadians, index) => {
-      const jointName = actuatorMapping[side][index.toString()];
-      if (jointName && sceneStateRef.current.robot?.joints[jointName]) {
-        // Store update for batch processing
-        jointUpdates[jointName] = angleInRadians;
-
-        // Update robot joint immediately
-        sceneStateRef.current.robot.joints[jointName].setJointValue(angleInRadians);
-      } else {
-        console.warn(`Joint not found for ${side}[${index}]: ${jointName}`);
-      }
-    });
-
-    console.log(`Updated ${Object.keys(jointUpdates).length} joints for ${side} arm`);
-  };
-
   const updateStatus = (msg: string) => {
     setStatus(msg);
   };
@@ -207,12 +179,11 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     const refSpace = renderer.xr.getReferenceSpace();
 
     // Setup WebXR session event listeners for camera positioning
-    renderer.xr.addEventListener('sessionstart', async () => {
+    renderer.xr.addEventListener('sessionstart', () => {
       // Position the VR camera at the desired location
       const vrCamera = renderer.xr.getCamera();
       vrCamera.position.set(0.107, 0.239, -5.000);
       vrCamera.lookAt(1, 0.239, -2.000); // Face towards positive X
-      await new Promise(resolve => setTimeout(resolve, 2000)); 
       updateStatus('VR camera positioned');
     });
 
@@ -264,18 +235,16 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
             // Process left and right joint arrays
             if(data.joints) {
               if (data.joints.left && Array.isArray(data.joints.left)) {
-                processJointArray('left', data.joints.left);
+                updateURDF('left', data.joints.left, sceneStateRef.current);
               }
 
               if (data.joints.right && Array.isArray(data.joints.right)) {
-                processJointArray('right', data.joints.right);
+                updateURDF('right', data.joints.right, sceneStateRef.current);
               }
             }
             
             // Process distance data for STL mesh color updates
-            if(data.distances) {
-              console.log(`Received distances - Left: ${data.distances.left?.toFixed(3)}, Right: ${data.distances.right?.toFixed(3)}`);
-              
+            if(data.distances) {              
               // Update left hand mesh color based on its own distance (green to red spectrum)
               if (data.distances.left !== undefined && sceneStateRef.current.leftHandMesh) {
                 const leftDistance = data.distances.left;
@@ -295,17 +264,14 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
 
         webSocket.onerror = (error) => {
           resolve(false);
-          console.log(`Hand tracking WebSocket error: ${error}`);
           updateStatus('Hand tracking WebSocket error');
         };
 
         webSocket.onclose = () => {
-          console.log('Hand tracking WebSocket closed');
           updateStatus('Hand tracking WebSocket closed');
         };
 
       } catch (error) {
-        console.log(`Failed to setup hand tracking WebSocket: ${error}`);
         updateStatus('Failed to setup hand tracking WebSocket');
       }
     });

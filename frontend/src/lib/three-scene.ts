@@ -137,8 +137,8 @@ export type sceneState = {
         
         function createVideoPlaneMesh(videoTexture: THREE.VideoTexture | null) {
           // Create video plane geometry that matches the actual video aspect ratio
-          const defaultVideoWidth = 1920;  // fallback to expected stream size
-          const defaultVideoHeight = 1080;  // fallback to expected stream size
+          const defaultVideoWidth = 640;  // fallback to expected stream size
+          const defaultVideoHeight = 480;  // fallback to expected stream size
           const actualVideoWidth = (videoRef.current && (videoRef.current as HTMLVideoElement).videoWidth) || defaultVideoWidth;
           const actualVideoHeight = (videoRef.current && (videoRef.current as HTMLVideoElement).videoHeight) || defaultVideoHeight;
           const videoAspectRatio = actualVideoWidth / actualVideoHeight;

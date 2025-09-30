@@ -210,6 +210,7 @@ class TeleopCore:
             self.converged = True
         if not self.converged:
             return (None, None, None, None)
+        print(f"Sending joints to URDF Viewer: {right_arm_joints.tolist() + [right_gripper_joint]}, {left_arm_joints.tolist() + [left_gripper_joint]}")
         await self.websocket.send(json.dumps(payload))
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
