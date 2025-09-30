@@ -1,23 +1,7 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
-import { sceneState } from './three-scene';
+import { SceneState, LocalTargetLocation, TrackingResult } from './types';
 
-export type localTargetLocation = {
-  left: {
-    position: number[];
-    orientation: number[];
-  };
-  right: {
-    position: number[];
-    orientation: number[];
-  };
-};
-
-export type trackingResult = {
-  type: "hand" | "controller";
-  handPositions: localTargetLocation;
-  payload: any;
-}
 /**
   Function that shifts the controllers position in the opposite direction of its
   orientation. Used to align the tip of the controller/end-effector with the
@@ -47,9 +31,9 @@ function shiftTargetWithOrientation(pos, ori, offset) {
   ]
 }
 
-function handleHandTracking(frame, referenceSpace): trackingResult {  
+function handleHandTracking(frame, referenceSpace): TrackingResult {  
   const handData = {};
-  const handPositions: localTargetLocation = { left: null, right: null };
+  const handPositions: LocalTargetLocation = { left: null, right: null };
   const JOINT_ORDER = [
     "wrist", "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
     "index-finger-metacarpal", "index-finger-phalanx-proximal", "index-finger-phalanx-intermediate", 
@@ -112,8 +96,8 @@ function handleHandTracking(frame, referenceSpace): trackingResult {
   return { type: "hand", handPositions: handPositions, payload: handData };
 }
 
-function handleControllerTracking(frame, referenceSpace): trackingResult {  
-  const controllerData: localTargetLocation = { left: null, right: null };  
+function handleControllerTracking(frame, referenceSpace): TrackingResult {  
+  const controllerData: LocalTargetLocation = { left: null, right: null };  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
       const handedness = inputSource.handedness;
@@ -154,7 +138,7 @@ function handleControllerTracking(frame, referenceSpace): trackingResult {
   return { type: "controller", handPositions: controllerData, payload: controllerData };
 }
 
-export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands): trackingResult | null {
+export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands): TrackingResult | null {
   const now = performance.now();
   const sendInterval = 1000 / 40; // 0 Hz
   const shouldSend = now - lastHandSendRef.current >= sendInterval;
@@ -184,7 +168,7 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
 }
 
 // Handle controller input for pause toggle
-export const handleControllerInput = (frame: any, referenceSpace: any, sceneState: sceneState) => {
+export const handleControllerInput = (frame: any, referenceSpace: any, sceneState: SceneState) => {
   if (!frame || !referenceSpace) return;
 
   const inputSources = frame.session.inputSources;

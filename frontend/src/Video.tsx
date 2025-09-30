@@ -1,4 +1,5 @@
 // VideoScreenWeb.tsx
+import {AppConnectionMessage, SignalingMessage, WebRtcInitializationMessage } from 'lib/types';
 import { useEffect, useRef, useCallback } from 'react';
 
 const configuration = {
@@ -46,13 +47,14 @@ export default function VideoScreenWeb({
 
       pc.current.onicecandidate = (event) => {
         if (event.candidate && ws.current) {
+          const message = {
+            ice: {
+              candidate: event.candidate.candidate,
+              sdpMLineIndex: event.candidate.sdpMLineIndex,
+            },
+          };
           ws.current.send(
-            JSON.stringify({
-              ice: {
-                candidate: event.candidate.candidate,
-                sdpMLineIndex: event.candidate.sdpMLineIndex,
-              },
-            })
+            JSON.stringify(message)
           );
         }
       };
@@ -66,21 +68,21 @@ export default function VideoScreenWeb({
     ws.current.onopen = () => {
       console.log('WebSocket connected');
       setIsConnected(true);
-      ws.current?.send(JSON.stringify({
+      const message: AppConnectionMessage = {
         role: "app",
-        robot_id: "box",
         robot_ip: robotIp,
-      }));
+      };
+      ws.current?.send(JSON.stringify(message));
     };
 
     ws.current.onmessage = async (event) => {
-      const message = JSON.parse(event.data);
+      const message: SignalingMessage = JSON.parse(event.data);
       console.log('message', message);
-      if(message.type === "robot_available"){ 
-        console.log("sending HELLO with cameras:", activeCameras);
-        const message = {
+      if(message.type === 'info' && message.payload === "robot_available"){ 
+        const message: WebRtcInitializationMessage = {
           type: "HELLO",
-          cameras: activeCameras,
+          cameras: activeCameras, 
+          audio: false
         };
         ws.current?.send(JSON.stringify(message));
      }

@@ -1,40 +1,20 @@
 import * as THREE from 'three';
-  
-export type sceneState = {
-    scene: THREE.Scene | null;
-    renderer: THREE.WebGLRenderer | null;
-    leftHandMesh: THREE.Mesh | null;
-    rightHandMesh: THREE.Mesh | null;
-    videoPlaneMesh: THREE.Mesh | null;
-    videoTexture: THREE.VideoTexture | null;
-    statusPlaneMesh: THREE.Mesh | null;
-    statusCanvas: HTMLCanvasElement | null;
-    statusTexture: THREE.CanvasTexture | null;
-    robot: any | null;
-    pauseCommands: boolean;
-    previousButtonStates: Map<string, boolean>;
-    lastLeftColorRef: number;
-    lastRightColorRef: number;
-  }
-  
-  export const DEFAULT_SCENE_STATE: sceneState = {
-    scene: null,
-    renderer: null,
-    leftHandMesh: null,
-    rightHandMesh: null,
-    videoPlaneMesh: null,
-    videoTexture: null,
-    statusPlaneMesh: null,
-    statusCanvas: null,
-    statusTexture: null,
-    robot: null,
-    pauseCommands: true,
-    previousButtonStates: new Map<string, boolean>(),
-    lastLeftColorRef: -1,
-    lastRightColorRef: -1
-  }
-  
-  export const cleanUpScene = (sceneState: sceneState) => {
+import { SceneState, DEFAULT_SCENE_STATE } from './types';
+
+  export const initThreeScene = (sceneState: SceneState) => {
+      const scene = new THREE.Scene();
+
+      // Set a background color
+      scene.background = new THREE.Color(0x222222);
+
+      // Add basic lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambientLight);
+
+      sceneState.scene = scene;
+  };
+
+  export const cleanUpScene = (sceneState: SceneState) => {
     if (sceneState.scene) {
         // Remove all meshes
         const meshesToClean = [
@@ -101,7 +81,7 @@ export type sceneState = {
   };
 
   // Create video plane when stream and scene are ready
-  export const createVideoPlane = async (sceneState: sceneState, stream: MediaStream | null, videoRef: React.RefObject<HTMLVideoElement>) => {
+  export const createVideoPlane = async (sceneState: SceneState, stream: MediaStream | null, videoRef: React.RefObject<HTMLVideoElement>) => {
     return new Promise((resolve, reject) => {
       if (sceneState.scene) {
         // Create video texture if stream is available
@@ -199,7 +179,7 @@ export type sceneState = {
   };
 
   // Update video texture when stream becomes available
-  export const updateVideoTexture = (sceneState: sceneState, stream: MediaStream | null, videoRef: React.RefObject<HTMLVideoElement>) => {
+  export const updateVideoTexture = (sceneState: SceneState, stream: MediaStream | null, videoRef: React.RefObject<HTMLVideoElement>) => {
     if (stream && videoRef.current && sceneState.videoPlaneMesh && sceneState.videoPlaneMesh.material instanceof THREE.MeshBasicMaterial) {
       // Wait for video to be ready
       const setupVideoTexture = () => {
@@ -241,7 +221,7 @@ export type sceneState = {
   };
 
   // Function to update STL mesh color based on distance
-  export const updateMeshColor = (mesh: THREE.Mesh | null, color: number, handSide: string, lastColorRef: number, sceneState: sceneState) => {
+  export const updateMeshColor = (mesh: THREE.Mesh | null, color: number, handSide: string, lastColorRef: number, sceneState: SceneState) => {
     if (mesh && mesh.material instanceof THREE.MeshLambertMaterial) {
       if (lastColorRef !== color) {
         mesh.material.color.setHex(color);

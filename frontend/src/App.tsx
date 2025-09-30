@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import VideoScreenWeb from './Video';
-import SideBySideVideo from './SideBySideVideo';
-import VRViewer from './URDFViewer';
+import SideBySideVideo from './BrowserView';
+import VRViewer from './WebXR';
 
 type DisplayMode = 'vr' | 'browser';
 
 function App() {
   // Utility functions for URL parameters
-  const getUrlParam = (name, defaultValue) => {
+  const getUrlParam = (name: string, defaultValue: string): string => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get(name) || defaultValue;
   };
 
-  const updateUrlParam = (name, value) => {
+  const updateUrlParam = (name: string, value: string): void => {
     const url = new URL(window.location.toString());
     url.searchParams.set(name, value);
     window.history.replaceState({}, '', url);
@@ -22,8 +22,8 @@ function App() {
   const [url, setUrl] = useState(`wss://${window.location.hostname}${portString}/service2`);
   const [viewMode, setViewMode] = useState<DisplayMode>("vr");
   const [isConnected, setIsConnected] = useState(false);
-  const [streams, setStreams] = useState([]); // Array of MediaStreams
-  const [activeCameras, setActiveCameras] = useState([0]); // Camera 0 starts active
+  const [streams, setStreams] = useState<MediaStream[]>([]);
+  const [activeCameras, setActiveCameras] = useState<number[]>([0]); // Default to Camera 0 only
   const [udpHost, setUdpHost] = useState(getUrlParam('udpHost', '10.33.13.62'));
 
   const handleConnect = async () => {
@@ -48,7 +48,7 @@ function App() {
     setStreams([]);
   };
 
-  const toggleCamera = (cameraIndex) => {
+  const toggleCamera = (cameraIndex: number): void => {
     setActiveCameras(prev => {
       if (prev.includes(cameraIndex)) {
         // Remove camera if it's already active
@@ -90,7 +90,7 @@ function App() {
           fontWeight: 'bold',
           margin: '0'
         }}>
-          K-Scale
+          K-Scale VR Teleop
         </h1>
         {!isConnected && (
           <>
