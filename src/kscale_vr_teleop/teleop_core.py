@@ -1,16 +1,14 @@
 import numpy as np
-from kscale_vr_teleop._assets import ASSETS_DIR
-from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
-from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 from kscale_vr_teleop.command_conn import Commander16
 # from kscale_vr_teleop.udp_conn import UDPHandler
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
 import rerun as rr
 from line_profiler import profile
 import json
+import time
 
 class TeleopCore:
-    def __init__(self, websocket, udp_host, udp_port):
+    def __init__(self, websocket, udp_host, udp_port, urdf_logger, ik_solver):
         self.websocket = websocket
         self.head_matrix = np.eye(4, dtype=np.float32)
         self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
@@ -28,23 +26,24 @@ class TeleopCore:
         self.left_wrist_pose[:3,:3] = default_wrist_rotation
         self.right_wrist_pose[:3,:3] = default_wrist_rotation
 
-        self.urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
-        self.urdf_logger = URDFLogger(self.urdf_path)
-        self.ik_solver = RobotInverseKinematics(self.urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
+        self.urdf_logger = urdf_logger
+        self.ik_solver = ik_solver
 
         self.base_to_head_transform = np.eye(4)
         self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
 
         self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
-        # self.kos_command_handler = UDPHandler(udp_host=udp_host, udp_port=udp_port)
-        self.log_joint_angles(np.zeros(5), np.zeros(5))
 
         # Gripper values from controller inputs (0.0 to 1.0)
-        self.right_gripper_value = 0.0
-        self.left_gripper_value = 0.0
+        self.right_gripper_value = 1.0
+        self.left_gripper_value = 1.0
 
         self.use_fingers = False
-
+        self.converged = False
+        
+        # Track message timing to detect gaps (unpause)
+        self.last_message_time = None
+        
     def update_head(self, matrix: np.ndarray):
         self.head_matrix = matrix
 
@@ -82,6 +81,21 @@ class TeleopCore:
         ))
         self.use_fingers = False
 
+    def _check_message_timing(self):
+        """Check time between messages and reset converged flag if gap > 0.5s"""
+        current_time = time.time()
+        
+        if self.last_message_time is not None:
+            time_delta = current_time - self.last_message_time
+            
+            if time_delta >= 0.5:
+                print(f"Message gap detected: {time_delta:.3f}s - resetting converged flag")
+                self.converged = False
+            else:
+                print(f"Message received after {time_delta:.3f}s")
+        
+        self.last_message_time = current_time
+    
     def log_joint_angles(self, right_arm: list, left_arm: list):
         new_config = {k: right_arm[i] for i, k in enumerate(self.ik_solver.active_joints[:5])}
         new_config.update({k: left_arm[i] for i, k in enumerate(self.ik_solver.active_joints[5:])})
@@ -96,8 +110,8 @@ class TeleopCore:
     
     def _compute_gripper_from_controllers(self):
         # Placeholder: map controller trigger/grip values to gripper joint positions
-        right_gripper_joint = 0.068 * (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
-        left_gripper_joint = 0.068 * (1.0 - self.left_gripper_value)
+        right_gripper_joint =  (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
+        left_gripper_joint = (1.0 - self.left_gripper_value)
         return right_gripper_joint, left_gripper_joint
 
     @profile
@@ -191,17 +205,29 @@ class TeleopCore:
                 "left": float(left_distance)
             }
         }
+        self._check_message_timing()
+        if (right_distance < 0.025 and left_distance < 0.025):
+            self.converged = True
+        if not self.converged:
+            return (None, None, None, None)
         await self.websocket.send(json.dumps(payload))
-
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
                 right_finger_angles,
                 left_finger_angles)
-    
-    def send_kinfer_commands(self, right_arm: list, left_arm: list):
+
+    async def compute_and_send_joints(self):
+        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = await self.compute_joint_angles()
+        if right_arm_joints is None or left_arm_joints is None:
+            return
+        self.log_joint_angles(right_arm_joints, left_arm_joints)
+        self._send_kinfer_commands(right_arm_joints, left_arm_joints)
+
+    def _send_kinfer_commands(self, right_arm: list, left_arm: list):
         '''
         Takes input in the same format as compute_joint_angles arm output
         '''
+
         self.kinfer_command_handler.send_commands(right_arm, left_arm)
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):

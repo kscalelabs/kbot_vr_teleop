@@ -187,7 +187,7 @@ function App() {
                 setStreams={setStreams}
                 setIsConnected={() => { }}
                 url={url}
-                signalingUrl="10.33.13.62"
+                robotIp={udpHost}
                 activeCameras={activeCameras}
               />
 
