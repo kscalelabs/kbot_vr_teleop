@@ -89,11 +89,13 @@ class TrackingHandler:
         controller_pose[:3, 3] -= self.teleop_core.head_matrix[:3, 3]
         
         gripper_value = controller.get('trigger', 0.0)
+        joystick_x = controller.get('joystickX', 0.0)
+        joystick_y = controller.get('joystickY', 0.0)
         # Update controller state
         if side == 'left':
-            self.teleop_core.update_left_controller(controller_pose, gripper_value)
+            self.teleop_core.update_left_controller(controller_pose, gripper_value, joystick_x, joystick_y)
         else:
-            self.teleop_core.update_right_controller(controller_pose, gripper_value)
+            self.teleop_core.update_right_controller(controller_pose, gripper_value, joystick_x, joystick_y)
 
     def _handle_hand_tracking(self, hand_data, side):
         hand_mat_numpy = np.array(hand_data, dtype=np.float32).reshape(25,4,4).transpose((0,2,1))
@@ -112,12 +114,12 @@ class TrackingHandler:
         '''
         props = ["left", "right"]
         for prop in props:
-            if event.get(prop) != None:
-                mat_raw = event[prop]
-                if isinstance(mat_raw, dict):
-                    self._handle_controller_tracking(mat_raw, prop)
+            hand = event.get(prop, None)
+            if hand != None:
+                if isinstance(hand, dict):
+                    self._handle_controller_tracking(hand, prop)
                 else:
-                    self._handle_hand_tracking(mat_raw, prop)
+                    self._handle_hand_tracking(hand, prop)
 
         await self.teleop_core.compute_and_send_joints()
 
