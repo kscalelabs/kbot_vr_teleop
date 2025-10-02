@@ -59,7 +59,7 @@ import { SceneState, DEFAULT_SCENE_STATE } from './types';
           }
       }
 
-  export const createStatusCanvas = (text: string) => {
+  export const createStatusCanvas = (text: string, isPaused: boolean = false) => {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
@@ -70,12 +70,55 @@ import { SceneState, DEFAULT_SCENE_STATE } from './types';
     ctx.fillStyle = '#333333';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw text
+    // Draw text - left aligned and smaller
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 48px Arial';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    
+    // Split text by lines if it contains newlines
+    const lines = text.split('\n');
+    const lineHeight = 30;
+    const leftPadding = 20;
+    const topPadding = 20;
+    
+    lines.forEach((line, index) => {
+      ctx.fillText(line, leftPadding, topPadding + (index * lineHeight));
+    });
+
+    // Draw play/pause button on the right side
+    const buttonX = canvas.width - 80;
+    const buttonY = 30;
+    const buttonSize = 40;
+    
+    // Draw button background circle
+    ctx.fillStyle = '#555555';
+    ctx.beginPath();
+    ctx.arc(buttonX, buttonY, buttonSize / 2, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    // Draw play or pause icon
+    ctx.fillStyle = '#ffffff';
+    if (isPaused) {
+      // Draw play triangle
+      ctx.beginPath();
+      ctx.moveTo(buttonX - 8, buttonY - 10);
+      ctx.lineTo(buttonX - 8, buttonY + 10);
+      ctx.lineTo(buttonX + 10, buttonY);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Draw pause bars
+      ctx.fillRect(buttonX - 8, buttonY - 10, 6, 20);
+      ctx.fillRect(buttonX + 2, buttonY - 10, 6, 20);
+    }
+    
+    // Draw text below button
+    ctx.font = '14px Arial';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText("Press 'X'", buttonX, buttonY + 35);
+    ctx.fillText("to toggle", buttonX, buttonY + 50);
 
     return canvas;
   };
@@ -150,7 +193,7 @@ import { SceneState, DEFAULT_SCENE_STATE } from './types';
           const statusGeometry = new THREE.PlaneGeometry(statusWidth, statusHeight);
 
           // Create initial status canvas
-          const initialCanvas = createStatusCanvas('false');
+          const initialCanvas = createStatusCanvas('Left: (0.00, 0.00)\nRight: (0.00, 0.00)\nScale: 0.10', true);
           if (initialCanvas) {
             sceneState.statusCanvas = initialCanvas;
             const statusTexture = new THREE.CanvasTexture(initialCanvas);

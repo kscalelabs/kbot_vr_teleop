@@ -59,10 +59,12 @@ class TeleopCore:
         rr.log('right_wrist', rr.Transform3D(translation=self.right_wrist_pose[:3, 3], mat3x3=self.right_wrist_pose[:3, :3], axis_length=0.05))
         self.use_fingers = True
 
-    def update_left_controller(self, pose: np.ndarray, gripper_value: float):
+    def update_left_controller(self, pose: np.ndarray, gripper_value: float, joystick_x: float, joystick_y: float):
         """Update left controller pose and gripper value"""
         self.left_wrist_pose = pose
         self.left_gripper_value = gripper_value
+        self.left_joystick_x = joystick_x
+        self.left_joystick_y = joystick_y
         rr.log('left_controller', rr.Transform3D(
             translation=self.left_wrist_pose[:3, 3], 
             mat3x3=self.left_wrist_pose[:3, :3], 
@@ -70,10 +72,12 @@ class TeleopCore:
         ))
         self.use_fingers = False
     
-    def update_right_controller(self, pose: np.ndarray, gripper_value: float):
+    def update_right_controller(self, pose: np.ndarray, gripper_value: float, joystick_x: float, joystick_y: float):
         """Update right controller pose and gripper value"""
         self.right_wrist_pose = pose
         self.right_gripper_value = gripper_value
+        self.right_joystick_x = joystick_x
+        self.right_joystick_y = joystick_y
         rr.log('right_controller', rr.Transform3D(
             translation=self.right_wrist_pose[:3, 3], 
             mat3x3=self.right_wrist_pose[:3, :3], 
@@ -91,8 +95,8 @@ class TeleopCore:
             if time_delta >= 0.5:
                 print(f"Message gap detected: {time_delta:.3f}s - resetting converged flag")
                 self.converged = False
-            else:
-                print(f"Message received after {time_delta:.3f}s")
+            # else:
+            #     print(f"Message received after {time_delta:.3f}s")
         
         self.last_message_time = current_time
     
@@ -195,7 +199,17 @@ class TeleopCore:
         rr.log("plots/tracking_accuracy/Left Distance", rr.Scalars(left_distance))
         
         payload = {
-            "type": "kinematics", 
+            "type": "kinematics",
+            "joysticks": {
+                "right":{
+                    "x": self.right_joystick_x, 
+                    "y": self.right_joystick_y
+                },
+                "left": {
+                    "x": self.left_joystick_x,
+                    "y": self.left_joystick_y
+                }
+            },
             "joints": {
                 "right": right_arm_joints.tolist(), 
                 "left": left_arm_joints.tolist()
@@ -209,26 +223,28 @@ class TeleopCore:
         if (right_distance < 0.025 and left_distance < 0.025):
             self.converged = True
         if not self.converged:
-            return (None, None, None, None)
+            return (None, None, None, None, None, None)
         await self.websocket.send(json.dumps(payload))
         return (right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
                 right_finger_angles,
-                left_finger_angles)
+                left_finger_angles, 
+                (self.right_joystick_x, self.right_joystick_y),
+                (self.left_joystick_x, self.left_joystick_y))
 
     async def compute_and_send_joints(self):
-        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles = await self.compute_joint_angles()
+        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles, right_joystick, left_joystick = await self.compute_joint_angles()
         if right_arm_joints is None or left_arm_joints is None:
             return
         self.log_joint_angles(right_arm_joints, left_arm_joints)
-        self._send_kinfer_commands(right_arm_joints, left_arm_joints)
+        self._send_kinfer_commands(right_arm_joints, left_arm_joints, right_joystick, left_joystick)
 
-    def _send_kinfer_commands(self, right_arm: list, left_arm: list):
+    def _send_kinfer_commands(self, right_arm: list, left_arm: list, right_joystick: tuple, left_joystick: tuple):
         '''
         Takes input in the same format as compute_joint_angles arm output
         '''
 
-        self.kinfer_command_handler.send_commands(right_arm, left_arm)
+        self.kinfer_command_handler.send_commands(right_arm, left_arm, right_joystick, left_joystick)
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):
     #     '''
