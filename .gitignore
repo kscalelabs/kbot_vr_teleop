@@ -2,3 +2,4 @@ __pycache__
 profile_output*
 node_modules/
 *.egg-info
+.vscode/
