@@ -21,9 +21,11 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   const [status, setStatus] = useState('');
   const wsRef = useRef<WebSocket | null>(null);
   const [loadCount, setLoadCount] = useState(0);
-
+  const [leftJoystick, setLeftJoystick] = useState([0, 0]);
+  const [rightJoystick, setRightJoystick] = useState([0, 0]);
   const xrSessionRef = useRef<XRSession | null>(null);
-
+  const [joystickScale, setJoystickScale] = useState(0.1);
+  const [pauseCommands, setPauseCommands] = useState(true);
   // Single state object for all scene-related refs
   const sceneStateRef = useRef<SceneState>(DEFAULT_SCENE_STATE);
 
@@ -53,17 +55,18 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     };
   }, []);
 
-  // Update status text when pause state changes
+  // Update status text when joystick state changes
   useEffect(() => {
     if (sceneStateRef.current.statusCanvas && sceneStateRef.current.statusTexture) {
-      const newCanvas = createStatusCanvas(sceneStateRef.current.pauseCommands.toString());
+      const joystickText = `Left: (${leftJoystick[0].toFixed(2)}, ${leftJoystick[1].toFixed(2)})\nRight: (${rightJoystick[0].toFixed(2)}, ${rightJoystick[1].toFixed(2)})\nScale: ${joystickScale.toFixed(2)}`;
+      const newCanvas = createStatusCanvas(joystickText, pauseCommands);
       if (newCanvas) {
         sceneStateRef.current.statusCanvas = newCanvas;
         sceneStateRef.current.statusTexture.image = newCanvas;
         sceneStateRef.current.statusTexture.needsUpdate = true;
       }
     }
-  }, [sceneStateRef.current.pauseCommands]);
+  }, [leftJoystick, rightJoystick, joystickScale, pauseCommands]);
 
   const resetScene = async () => {
     if (xrSessionRef.current) {
@@ -184,13 +187,26 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     renderer.setAnimationLoop((time, frame) => {
       if (!frame || !sceneStateRef.current.scene) return;
 
-      // Handle controller input for pause toggle
+      // Handle controller input for pause toggle and joystick scale
       handleControllerInput(frame, refSpace, sceneStateRef.current);
 
       // Tracking → positions/orientations → STL mesh updates
-      let handPositions = handleTracking(frame, refSpace, wsRef, lastHandSendRef, sceneStateRef.current.pauseCommands);
-      if (handPositions) updateSTLPositions(sceneStateRef.current, handPositions);
-
+      let handPositions = handleTracking(frame, refSpace, wsRef, lastHandSendRef, sceneStateRef.current.pauseCommands, sceneStateRef.current.joystickScale);
+      if (handPositions) {
+        updateSTLPositions(sceneStateRef.current, handPositions);
+        // Update joystick states if controller data is available
+        if (handPositions.type === 'controller') {
+          if (handPositions.payload.left) {
+            setLeftJoystick([handPositions.payload.left.joystickX || 0, handPositions.payload.left.joystickY || 0]);
+          }
+          if (handPositions.payload.right) {
+            setRightJoystick([handPositions.payload.right.joystickX || 0, handPositions.payload.right.joystickY || 0]);
+          }
+          // Update scale and pause states for display
+          setJoystickScale(sceneStateRef.current.joystickScale);
+          setPauseCommands(sceneStateRef.current.pauseCommands);
+        }
+      }
       renderer.render(sceneStateRef.current.scene, camera);
     });
   };

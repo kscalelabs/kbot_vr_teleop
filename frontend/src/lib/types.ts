@@ -49,6 +49,7 @@ export type SceneState = {
   statusTexture: THREE.CanvasTexture | null;
   robot: any | null;
   pauseCommands: boolean;
+  joystickScale: number;
   previousButtonStates: Map<string, boolean>;
   lastLeftColorRef: number;
   lastRightColorRef: number;
@@ -66,6 +67,7 @@ export const DEFAULT_SCENE_STATE: SceneState = {
   statusTexture: null,
   robot: null,
   pauseCommands: true,
+  joystickScale: 0.1,
   previousButtonStates: new Map<string, boolean>(),
   lastLeftColorRef: -1,
   lastRightColorRef: -1

@@ -1,5 +1,6 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
+import React from 'react';
 import { SceneState, LocalTargetLocation, TrackingResult } from './types';
 
 /**
@@ -96,7 +97,7 @@ function handleHandTracking(frame, referenceSpace): TrackingResult {
   return { type: "hand", handPositions: handPositions, payload: handData };
 }
 
-function handleControllerTracking(frame, referenceSpace): TrackingResult {  
+function handleControllerTracking(frame, referenceSpace, joystickScale: number): TrackingResult {  
   const controllerData: LocalTargetLocation = { left: null, right: null };  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
@@ -119,17 +120,25 @@ function handleControllerTracking(frame, referenceSpace): TrackingResult {
         let trigger = 0.0;
         let grip = 0.0;
         let buttons = [];
+        let joystickX = 0.0;
+        let joystickY = 0.0;
         if (gamepad) {
           trigger = gamepad.buttons[0]?.value || 0.0;
           grip = gamepad.buttons[1]?.value || 0.0;
           buttons = gamepad.buttons.map(button => button.pressed);
+          // Joystick axes: typically axes[2] = x, axes[3] = y
+          // Center is 0,0 with range from -1 to 1
+          joystickX = gamepad.axes[2] || 0.0;
+          joystickY = -1 * (gamepad.axes[3] || 0.0);
         }
         controllerData[handedness] = {
           position,
           orientation,
           trigger,
           grip,
-          buttons
+          buttons,
+          joystickX: joystickX * joystickScale,
+          joystickY: joystickY * joystickScale,
         };
       }
     }
@@ -138,7 +147,7 @@ function handleControllerTracking(frame, referenceSpace): TrackingResult {
   return { type: "controller", handPositions: controllerData, payload: controllerData };
 }
 
-export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands): TrackingResult | null {
+export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands, joystickScale): TrackingResult | null {
   const now = performance.now();
   const sendInterval = 1000 / 40; // 0 Hz
   const shouldSend = now - lastHandSendRef.current >= sendInterval;
@@ -152,7 +161,7 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
 
   let respone = handleHandTracking(frame, referenceSpace);
   if(respone.handPositions.left == null || respone.handPositions.right == null){
-    respone = handleControllerTracking(frame, referenceSpace);
+    respone = handleControllerTracking(frame, referenceSpace, joystickScale);
   }
   if(pauseCommands){
     return respone;
@@ -167,12 +176,12 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
   return respone;
 }
 
-// Handle controller input for pause toggle
+// Handle controller input for pause toggle and joystick scale
 export const handleControllerInput = (frame: any, referenceSpace: any, sceneState: SceneState) => {
   if (!frame || !referenceSpace) return;
 
   const inputSources = frame.session.inputSources;
-
+  
   for (const inputSource of inputSources) {
     if (!inputSource.gamepad) continue;
 
@@ -200,6 +209,37 @@ export const handleControllerInput = (frame: any, referenceSpace: any, sceneStat
         sceneState.previousButtonStates.set(stateKey, currentPressed);
       }
 
+    }
+
+    // Right controller A and B buttons for joystick scale adjustment
+    if (hand === 'right' && gamepad.buttons) {
+      // Button 4 = A button, Button 5 = B button on Quest controllers
+      
+      // A button - decrease joystick scale
+      if (gamepad.buttons[4]) {
+        const currentPressed = gamepad.buttons[4].pressed;
+        const stateKey = `${controllerKey}-a`;
+        const previousPressed = sceneState.previousButtonStates.get(stateKey) || false;
+
+        if (currentPressed && !previousPressed) {
+          sceneState.joystickScale = Math.max(0.0, sceneState.joystickScale - 0.05);
+        }
+
+        sceneState.previousButtonStates.set(stateKey, currentPressed);
+      }
+
+      // B button - increase joystick scale
+      if (gamepad.buttons[5]) {
+        const currentPressed = gamepad.buttons[5].pressed;
+        const stateKey = `${controllerKey}-b`;
+        const previousPressed = sceneState.previousButtonStates.get(stateKey) || false;
+
+        if (currentPressed && !previousPressed) {
+          sceneState.joystickScale += 0.05;
+        }
+
+        sceneState.previousButtonStates.set(stateKey, currentPressed);
+      }
     }
   }
 };
