@@ -1,3 +1,0 @@
-# This script is incomplete: these are just the steps that were missing on my PC (Eric)
-sudo apt-get install python3-gi gir1.2-gst-plugins-bad-1.0 gir1.2-gst-plugins-base-1.0 gir1.2-gstreamer-1.0 gstreamer1.0-plugins-bad
-sudo apt-get install libnice10 libnice-dev gstreamer1.0-nice
