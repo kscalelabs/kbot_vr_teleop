@@ -183,13 +183,13 @@ function App() {
           <>
             <div style={{ width: '100%', height: '70vh', display: 'flex', flexDirection: 'column' }}>
               {/* Always mount VideoScreenWeb when connected - it provides the streams */}
-              <VideoScreenWeb
+              {/* <VideoScreenWeb
                 setStreams={setStreams}
                 setIsConnected={() => { }}
                 url={url}
                 robotIp={udpHost}
                 activeCameras={activeCameras}
-              />
+              /> */}
 
               {/* Conditionally mount the view component based on selected mode */}
               {viewMode === 'vr' ? (
