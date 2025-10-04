@@ -38,6 +38,12 @@ class TeleopCore:
         self.right_gripper_value = 1.0
         self.left_gripper_value = 1.0
 
+        # Joystick values from controller inputs
+        self.right_joystick_x = 0.0
+        self.right_joystick_y = 0.0
+        self.left_joystick_x = 0.0
+        self.left_joystick_y = 0.0
+
         self.use_fingers = False
         self.converged = False
         
@@ -47,42 +53,30 @@ class TeleopCore:
     def update_head(self, matrix: np.ndarray):
         self.head_matrix = matrix
 
-    def update_left_hand(self, wrist: np.ndarray, fingers: np.ndarray):
-        self.left_wrist_pose = wrist
-        self.left_finger_poses = fingers
-        rr.log('left_wrist', rr.Transform3D(translation=self.left_wrist_pose[:3, 3], mat3x3=self.left_wrist_pose[:3, :3], axis_length=0.05))
-        self.use_fingers = True
-    
-    def update_right_hand(self, wrist: np.ndarray, fingers: np.ndarray):
-        self.right_wrist_pose = wrist
-        self.right_finger_poses = fingers
-        rr.log('right_wrist', rr.Transform3D(translation=self.right_wrist_pose[:3, 3], mat3x3=self.right_wrist_pose[:3, :3], axis_length=0.05))
+    def update_joints(self, side: str, fingers: np.ndarray):
+        if side == 'left':
+            self.left_finger_poses = fingers
+        else:
+            self.right_finger_poses = fingers
         self.use_fingers = True
 
-    def update_left_controller(self, pose: np.ndarray, gripper_value: float, joystick_x: float, joystick_y: float):
-        """Update left controller pose and gripper value"""
-        self.left_wrist_pose = pose
-        self.left_gripper_value = gripper_value
-        self.left_joystick_x = joystick_x
-        self.left_joystick_y = joystick_y
-        rr.log('left_controller', rr.Transform3D(
-            translation=self.left_wrist_pose[:3, 3], 
-            mat3x3=self.left_wrist_pose[:3, :3], 
-            axis_length=0.05
-        ))
-        self.use_fingers = False
-    
-    def update_right_controller(self, pose: np.ndarray, gripper_value: float, joystick_x: float, joystick_y: float):
-        """Update right controller pose and gripper value"""
-        self.right_wrist_pose = pose
-        self.right_gripper_value = gripper_value
-        self.right_joystick_x = joystick_x
-        self.right_joystick_y = joystick_y
-        rr.log('right_controller', rr.Transform3D(
-            translation=self.right_wrist_pose[:3, 3], 
-            mat3x3=self.right_wrist_pose[:3, :3], 
-            axis_length=0.05
-        ))
+    def update_target_location(self, side: str, pose: np.ndarray):
+        if side == 'left':
+            self.left_wrist_pose = pose
+            rr.log('left_wrist', rr.Transform3D(translation=pose[:3, 3], mat3x3=pose[:3, :3], axis_length=0.05))
+        else:
+            self.right_wrist_pose = pose
+            rr.log('right_wrist', rr.Transform3D(translation=pose[:3, 3], mat3x3=pose[:3, :3], axis_length=0.05))
+
+    def update_buttons(self, side: str, gripper_value: float, joystick_x: float, joystick_y: float):
+        if side == 'left':
+            self.left_gripper_value = gripper_value
+            self.left_joystick_x = joystick_x
+            self.left_joystick_y = joystick_y
+        else:
+            self.right_gripper_value = gripper_value
+            self.right_joystick_x = joystick_x
+            self.right_joystick_y = joystick_y
         self.use_fingers = False
 
     def _check_message_timing(self):

@@ -1,42 +1,35 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
-import React from 'react';
-import { SceneState, LocalTargetLocation, TrackingResult } from './types';
+import { SceneState, LocalTargetLocation, TrackingResult, MasterResult, UnifiedTrackingResult } from './types';
 
 /**
-  Function that shifts the controllers position in the opposite direction of its
-  orientation. Used to align the tip of the controller/end-effector with the
-  tip of the controllers for a better teleoperation experience.
+  Function that shifts the position in a transformation matrix along its forward direction.
+  Used to align the tip of the controller/end-effector with the tip of the controllers 
+  for a better teleoperation experience.
+  
+  @param matrix - 4x4 transformation matrix in column-major format (16 elements)
+  @param offset - Distance to shift along forward direction (-Z axis)
+  @returns Modified matrix with shifted position
 */
-function shiftTargetWithOrientation(pos, ori, offset) {
-
-  const rotateVectorByQuaternion = (v, q) => {
-    const vx = v.x, vy = v.y, vz = v.z;
-    const qx = q.x, qy = q.y, qz = q.z, qw = q.w;
-    const ix =  qw * vx + qy * vz - qz * vy;
-    const iy =  qw * vy + qz * vx - qx * vz;
-    const iz =  qw * vz + qx * vy - qy * vx;
-    const iw = -qx * vx - qy * vy - qz * vz;
-    return {
-      x: ix * qw + iw * -qx + iy * -qz - iz * -qy,
-      y: iy * qw + iw * -qy + iz * -qx - ix * -qz,
-      z: iz * qw + iw * -qz + ix * -qy - iy * -qx,
-    };
-  };
-
-  const forward = rotateVectorByQuaternion({ x: 0, y: 0, z: -1 }, ori);
-  return [
-    pos.x - forward.x * offset,
-    pos.y - forward.y * offset,
-    pos.z - forward.z * offset,
-  ]
+function shiftMatrixAlongForward(matrix: number[], offset: number): number[] {
+  // Matrix is column-major: columns are [right, up, forward, position]
+  // Forward vector is 3rd column (indices 8, 9, 10)
+  // Position is 4th column (indices 12, 13, 14)
+  
+  const result = [...matrix];
+  
+  // Shift position by -forward * offset (negative because we want to move back along forward)
+  result[12] = matrix[12] - matrix[8] * offset;  // X position
+  result[13] = matrix[13] - matrix[9] * offset;  // Y position
+  result[14] = matrix[14] - matrix[10] * offset; // Z position
+  
+  return result;
 }
 
-function handleHandTracking(frame, referenceSpace): TrackingResult {  
-  const handData = {};
-  const handPositions: LocalTargetLocation = { left: null, right: null };
+function handleHandTracking(frame, referenceSpace): UnifiedTrackingResult {  
+  const result: UnifiedTrackingResult = { type: "hand", left: null, right: null };
   const JOINT_ORDER = [
-    "wrist", "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
+    "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
     "index-finger-metacarpal", "index-finger-phalanx-proximal", "index-finger-phalanx-intermediate", 
     "index-finger-phalanx-distal", "index-finger-tip", "middle-finger-metacarpal", 
     "middle-finger-phalanx-proximal", "middle-finger-phalanx-intermediate", "middle-finger-phalanx-distal",
@@ -45,111 +38,87 @@ function handleHandTracking(frame, referenceSpace): TrackingResult {
     "pinky-finger-metacarpal", "pinky-finger-phalanx-proximal", "pinky-finger-phalanx-intermediate",
     "pinky-finger-phalanx-distal", "pinky-finger-tip"
   ];
+  
   for (const inputSource of frame.session.inputSources) {
     if (inputSource.hand) {
-      const handedness = inputSource.handedness;
-      const hand = inputSource.hand;
-      const continuousArray = [];
-      
-      // Extract wrist position for STL rendering
-      const wristJoint = hand.get('wrist');
-      if (wristJoint && frame.getJointPose) {
-        const wristPose = frame.getJointPose(wristJoint, referenceSpace);
-        if (wristPose) {
-          const ori = wristPose.transform.orientation;
-          const orientation = [
-            ori.x,
-            ori.y,
-            ori.z,
-            ori.w
-          ];
-          const pos = wristPose.transform.position;
-          const posititon = [
-            pos.x,
-            pos.y,
-            pos.z
-          ]
-          handPositions[handedness] = {
-            position: posititon,
-            orientation: orientation
-          };
-        }
-      }
-      
-      for (let i = 0; i < JOINT_ORDER.length; i++) {
-        const jointName = JOINT_ORDER[i];
-        const joint = hand.get(jointName);
-        if (joint && frame.getJointPose) {
-          const jointPose = frame.getJointPose(joint, referenceSpace);
-          if (jointPose) {
-            continuousArray.push(...Array.from(jointPose.transform.matrix));
-          } else {
-            continuousArray.push(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
+      const handedness: 'right' | 'left' = inputSource.handedness;
+      if (handedness === 'right' || handedness === 'left') {
+        const hand = inputSource.hand;
+        
+        // Get wrist matrix for targetLocation
+        const wristJoint = hand.get('wrist');
+        let wristMatrix: number[] = [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]; // Identity default
+        
+        if (wristJoint && frame.getJointPose) {
+          const wristPose = frame.getJointPose(wristJoint, referenceSpace);
+          if (wristPose) {
+            wristMatrix = Array.from(wristPose.transform.matrix);
           }
-        } else {
-          continuousArray.push(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
         }
-      }
-      handData[handedness] = continuousArray;
-    }
-  }
-
-  return { type: "hand", handPositions: handPositions, payload: handData };
-}
-
-function handleControllerTracking(frame, referenceSpace, joystickScale: number): TrackingResult {  
-  const controllerData: LocalTargetLocation = { left: null, right: null };  
-  for (const inputSource of frame.session.inputSources) {
-    if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
-      const handedness = inputSource.handedness;
-      const controllerPose = frame.getPose(inputSource.gripSpace, referenceSpace);
-      if (controllerPose) {
-        // Offset position 0.5 units opposite controller forward direction
-        const pos = controllerPose.transform.position;
-        const ori = controllerPose.transform.orientation;
-        const position = shiftTargetWithOrientation(pos, ori, 0.09);
         
-        const orientation = [
-          ori.x,
-          ori.y,
-          ori.z,
-          ori.w
-        ];
-        
-        const gamepad = inputSource.gamepad;
-        let trigger = 0.0;
-        let grip = 0.0;
-        let buttons = [];
-        let joystickX = 0.0;
-        let joystickY = 0.0;
-        if (gamepad) {
-          trigger = gamepad.buttons[0]?.value || 0.0;
-          grip = gamepad.buttons[1]?.value || 0.0;
-          buttons = gamepad.buttons.map(button => button.pressed);
-          // Joystick axes: typically axes[2] = x, axes[3] = y
-          // Center is 0,0 with range from -1 to 1
-          joystickX = gamepad.axes[2] || 0.0;
-          joystickY = -1 * (gamepad.axes[3] || 0.0);
+        // Get all finger joints (24 joints)
+        const fingerJoints: number[] = [];
+        for (let i = 0; i < JOINT_ORDER.length; i++) {
+          const jointName = JOINT_ORDER[i];
+          const joint = hand.get(jointName);
+          if (joint && frame.getJointPose) {
+            const jointPose = frame.getJointPose(joint, referenceSpace);
+            if (jointPose) {
+              fingerJoints.push(...(Array.from(jointPose.transform.matrix) as number[]));
+            } else {
+              fingerJoints.push(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
+            }
+          } else {
+            fingerJoints.push(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
+          }
         }
-        controllerData[handedness] = {
-          position,
-          orientation,
-          trigger,
-          grip,
-          buttons,
-          joystickX: joystickX * joystickScale,
-          joystickY: joystickY * joystickScale,
+        
+        result[handedness] = {
+          targetLocation: wristMatrix,  // 16 elements
+          joints: fingerJoints           // 384 elements (24 joints × 16)
         };
       }
     }
   }
 
-  return { type: "controller", handPositions: controllerData, payload: controllerData };
+  return result;
 }
 
-export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands, joystickScale): TrackingResult | null {
+function handleControllerTracking(frame, referenceSpace, joystickScale: number): UnifiedTrackingResult {  
+  const result: UnifiedTrackingResult = { type: "controller", left: null, right: null };
+  
+  for (const inputSource of frame.session.inputSources) {
+    if (inputSource.targetRayMode === 'tracked-pointer' && inputSource.gripSpace && !inputSource.hand) {
+        const handedness: 'right' | 'left' = inputSource.handedness;
+        if(handedness === 'right' || handedness === 'left'){
+          const controllerPose = frame.getPose(inputSource.gripSpace, referenceSpace);
+          
+          if (controllerPose) {
+            const gamepad = inputSource.gamepad;
+            
+            // Get matrix and shift position by 0.09 units along forward direction
+            const matrix = Array.from(controllerPose.transform.matrix) as number[];
+            const shiftedMatrix = shiftMatrixAlongForward(matrix, -0.09);
+            
+            result[handedness] = {
+              targetLocation: shiftedMatrix, // 16 elements with shifted position
+              joints: [],
+              trigger: gamepad?.buttons[0]?.value || 0,
+              grip: gamepad?.buttons[1]?.value || 0,
+              joystickX: (gamepad?.axes[2] || 0) * joystickScale,
+              joystickY: -(gamepad?.axes[3] || 0) * joystickScale,
+              buttons: gamepad?.buttons.map(b => b.pressed) || []
+            };
+          }
+      }
+    }
+  }
+  return result;
+}
+
+export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pauseCommands, joystickScale): UnifiedTrackingResult | null {
   const now = performance.now();
-  const sendInterval = 1000 / 40; // 0 Hz
+  const sendInterval = 1000 / 40; // 40 Hz
   const shouldSend = now - lastHandSendRef.current >= sendInterval;
   
   if (shouldSend) {
@@ -159,21 +128,26 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
     return null;
   }
 
-  let respone = handleHandTracking(frame, referenceSpace);
-  if(respone.handPositions.left == null || respone.handPositions.right == null){
-    respone = handleControllerTracking(frame, referenceSpace, joystickScale);
+  let response = handleHandTracking(frame, referenceSpace);
+  if(response.left == null || response.right == null){
+    response = handleControllerTracking(frame, referenceSpace, joystickScale);
   }
   if(pauseCommands){
-    return respone;
+    return response;
   }
-  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && Object.keys(respone.payload).length > 0) {
+  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
     try {
-      wsRef.current.send(JSON.stringify(respone.payload));
+      const message = {
+        type: "tracking",
+        left: response.left,
+        right: response.right
+      };
+      wsRef.current.send(JSON.stringify(message));
     } catch (error) {
-      console.log(`Failed to send controller tracking data: ${error}`);
+      console.log(`Failed to send tracking data: ${error}`);
     }
   }
-  return respone;
+  return response;
 }
 
 // Handle controller input for pause toggle and joystick scale

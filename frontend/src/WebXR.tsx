@@ -144,8 +144,8 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
     // Request the XR session with appropriate features
     try {
       const session = await navigator.xr.requestSession('immersive-vr', {
-        requiredFeatures: ['local-floor', 'viewer', 'hand-tracking'],
-        optionalFeatures: ['layers'],
+        requiredFeatures: ['local-floor', 'viewer'],
+        optionalFeatures: ['layers', 'hand-tracking'],
       });
       xrSessionRef.current = session;
       // Hand the session to Three (this sets up XRWebGLLayer, etc.)
@@ -191,16 +191,16 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
       handleControllerInput(frame, refSpace, sceneStateRef.current);
 
       // Tracking → positions/orientations → STL mesh updates
-      let handPositions = handleTracking(frame, refSpace, wsRef, lastHandSendRef, sceneStateRef.current.pauseCommands, sceneStateRef.current.joystickScale);
-      if (handPositions) {
-        updateSTLPositions(sceneStateRef.current, handPositions);
+      let trackingData = handleTracking(frame, refSpace, wsRef, lastHandSendRef, sceneStateRef.current.pauseCommands, sceneStateRef.current.joystickScale);
+      if (trackingData) {
+        updateSTLPositions(sceneStateRef.current, trackingData);
         // Update joystick states if controller data is available
-        if (handPositions.type === 'controller') {
-          if (handPositions.payload.left) {
-            setLeftJoystick([handPositions.payload.left.joystickX || 0, handPositions.payload.left.joystickY || 0]);
+        if (trackingData.type === "controller") {
+          if (trackingData.left) {
+            setLeftJoystick([trackingData.left.joystickX || 0, trackingData.left.joystickY || 0]);
           }
-          if (handPositions.payload.right) {
-            setRightJoystick([handPositions.payload.right.joystickX || 0, handPositions.payload.right.joystickY || 0]);
+          if (trackingData.right) {
+            setRightJoystick([trackingData.right.joystickX || 0, trackingData.right.joystickY || 0]);
           }
           // Update scale and pause states for display
           setJoystickScale(sceneStateRef.current.joystickScale);

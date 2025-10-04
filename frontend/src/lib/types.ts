@@ -23,6 +23,7 @@ export type LocalTargetLocation = {
   left: {
     position: number[];
     orientation: number[];
+
   } | null;
   right: {
     position: number[];
@@ -36,6 +37,21 @@ export type TrackingResult = {
   payload: any;
 };
 
+export type UnifiedTrackingResult = {
+  type: "hand" | "controller";
+  right: MasterResult | null
+  left: MasterResult | null
+};
+
+export type MasterResult = {
+  targetLocation: number[]
+  joints: number[]
+  joystickX?: number
+  joystickY?: number
+  trigger?: number
+  grip?: number
+  buttons?: boolean[]
+}
 // Three.js scene state
 export type SceneState = {
   scene: THREE.Scene | null;
