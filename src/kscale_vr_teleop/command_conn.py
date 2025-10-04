@@ -10,6 +10,16 @@ class Commander16:
         self.UDP_PORT = udp_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
+    def add_joint_bias(self, commands):
+        commands["rshoulderroll"] += math.radians(10.0)
+        commands["relbowpitch"] += math.radians(-90.0)
+        commands["rwristgripper"] += math.radians(-8.0)
+        commands["lshoulderroll"] += math.radians(-10.0)
+        commands["lelbowpitch"] += math.radians(90.0)
+        commands["lwristgripper"] += math.radians(-25.0)
+             
+        return commands
+        
     def build_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
         left_gripper = None 
         if len(left_arm_angles) > 5:
@@ -20,8 +30,8 @@ class Commander16:
             offset = math.radians(-8)  # Left grippers offset
             mapped_value = gripper_range_max - input_val * (gripper_range_max - gripper_range_min)
             left_gripper = mapped_value + offset
-        right_gripper = None
 
+        right_gripper = None
         if len(right_arm_angles) > 5:
             # Map 0-1 input to -25° to +25° radians with right gripper offset
             input_val = float(right_arm_angles[5])
@@ -31,27 +41,32 @@ class Commander16:
             mapped_value = gripper_range_max - input_val * (gripper_range_max - gripper_range_min)
             right_gripper = mapped_value + offset
 
-        new_commands = [right_joystick[1], right_joystick[0], left_joystick[0], 0, 0, 0]
-        new_commands += [
-            right_arm_angles[0],
-            right_arm_angles[1],
-            right_arm_angles[2],
-            right_arm_angles[3],
-            right_arm_angles[4],
-        ]
-        if right_gripper is not None:
-            new_commands += [float(right_gripper)]
-        new_commands += [
-            left_arm_angles[0],
-            left_arm_angles[1],
-            left_arm_angles[2],
-            left_arm_angles[3],
-            left_arm_angles[4],
-        ]
-        if left_gripper is not None:
-            new_commands += [float(left_gripper)]
-        return (json.dumps({"commands": new_commands}) + "\n").encode("utf-8")
+        new_commands = {
+            "xvel": right_joystick[1], # pushing up or down on right joystick is "X" axis for policies
+            "yvel": -right_joystick[0],
+            "yawrate": -left_joystick[0],
+            "baseheight":0,
+            "baseroll": 0,
+            "basepitch": 0,
+            "rshoulderpitch": right_arm_angles[0],
+            "rshoulderroll": right_arm_angles[1],
+            "rshoulderyaw": right_arm_angles[2],  
+            "relbowpitch": right_arm_angles[3],  
+            "rwristroll": right_arm_angles[4], 
+            "rwristgripper": right_gripper,  
+            "lshoulderpitch": left_arm_angles[0],  
+            "lshoulderroll": left_arm_angles[1],  
+            "lshoulderyaw": left_arm_angles[2],  
+            "lelbowpitch": left_arm_angles[3],  
+            "lwristroll": left_arm_angles[4],  
+            "lwristgripper": left_gripper,  
+        }
+
+
+
+        return (json.dumps({"commands": self.add_joint_bias(new_commands)}) + "\n").encode("utf-8")
 
     def send_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
         new_commands = self.build_commands(right_arm_angles, left_arm_angles, right_joystick, left_joystick)
+        print(new_commands)
         self.sock.sendto(new_commands, (self.UDP_IP, self.UDP_PORT)) 
