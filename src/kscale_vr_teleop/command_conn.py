@@ -11,12 +11,13 @@ class Commander16:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
     def add_joint_bias(self, commands):
-        commands["rshoulderroll"] += math.radians(-10.0)
-        commands["relbowroll"] += math.radians(90.0)
+        commands["rshoulderroll"] += math.radians(10.0)
+        commands["relbowpitch"] += math.radians(-90.0)
         commands["rwristgripper"] += math.radians(-8.0)
-        commands["lshoulderroll"] += math.radians(10.0)
-        commands["lelbowroll"] += math.radians(-90.0)
+        commands["lshoulderroll"] += math.radians(-10.0)
+        commands["lelbowpitch"] += math.radians(90.0)
         commands["lwristgripper"] += math.radians(-25.0)
+             
         return commands
         
     def build_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
@@ -42,21 +43,21 @@ class Commander16:
 
         new_commands = {
             "xvel": right_joystick[1], # pushing up or down on right joystick is "X" axis for policies
-            "yvel": right_joystick[0],
-            "yaw": left_joystick[0],
+            "yvel": -right_joystick[0],
+            "yawrate": -left_joystick[0],
             "baseheight":0,
             "baseroll": 0,
             "basepitch": 0,
             "rshoulderpitch": right_arm_angles[0],
             "rshoulderroll": right_arm_angles[1],
-            "relbowpitch": right_arm_angles[2],  
-            "relbowroll": right_arm_angles[3],  
+            "rshoulderyaw": right_arm_angles[2],  
+            "relbowpitch": right_arm_angles[3],  
             "rwristroll": right_arm_angles[4], 
             "rwristgripper": right_gripper,  
             "lshoulderpitch": left_arm_angles[0],  
             "lshoulderroll": left_arm_angles[1],  
-            "lelbowpitch": left_arm_angles[2],  
-            "lelbowroll": left_arm_angles[3],  
+            "lshoulderyaw": left_arm_angles[2],  
+            "lelbowpitch": left_arm_angles[3],  
             "lwristroll": left_arm_angles[4],  
             "lwristgripper": left_gripper,  
         }
