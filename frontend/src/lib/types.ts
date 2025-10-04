@@ -18,24 +18,22 @@ export interface AppConnectionMessage {
   robot_ip: string;
 }
 
-// Tracking types
-export type LocalTargetLocation = {
-  left: {
-    position: number[];
-    orientation: number[];
-  } | null;
-  right: {
-    position: number[];
-    orientation: number[];
-  } | null;
+
+export type UnifiedTrackingResult = {
+  type: "hand" | "controller";
+  right: TrackingResult | null
+  left: TrackingResult | null
 };
 
 export type TrackingResult = {
-  type: "hand" | "controller";
-  handPositions: LocalTargetLocation;
-  payload: any;
-};
-
+  targetLocation: number[]
+  joints: number[]
+  joystickX?: number
+  joystickY?: number
+  trigger?: number
+  grip?: number
+  buttons?: boolean[]
+}
 // Three.js scene state
 export type SceneState = {
   scene: THREE.Scene | null;

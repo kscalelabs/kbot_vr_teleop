@@ -1,15 +1,36 @@
 import * as THREE from 'three';
-import { TrackingResult, SceneState } from './types';
+import { UnifiedTrackingResult, SceneState } from './types';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 
 // Fixed local Z-axis offset for STL models (-90 degrees)
 const STL_Z_OFFSET = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
 
+// Helper function to extract position and quaternion from 4x4 matrix (column-major)
+const extractPoseFromMatrix = (matrix: number[]) => {
+    // Matrix is column-major: [m0,m1,m2,m3, m4,m5,m6,m7, m8,m9,m10,m11, m12,m13,m14,m15]
+    // Position is in the 4th column: [m12, m13, m14]
+    const position = new THREE.Vector3(matrix[12], matrix[13], matrix[14]);
+    
+    // Create rotation matrix from first 3 columns
+    const rotMatrix = new THREE.Matrix4();
+    rotMatrix.set(
+        matrix[0], matrix[4], matrix[8],  matrix[12],
+        matrix[1], matrix[5], matrix[9],  matrix[13],
+        matrix[2], matrix[6], matrix[10], matrix[14],
+        matrix[3], matrix[7], matrix[11], matrix[15]
+    );
+    
+    const quaternion = new THREE.Quaternion();
+    quaternion.setFromRotationMatrix(rotMatrix);
+    
+    return { position, quaternion };
+};
+
 // Update STL mesh positions based on hand tracking
-export const updateSTLPositions = (sceneState: SceneState, trackingResult: TrackingResult) => {
+export const updateSTLPositions = (sceneState: SceneState, trackingResult: UnifiedTrackingResult) => {
     if (!sceneState.scene) return;
-    const handPositions = trackingResult.handPositions;
-    const type = trackingResult.type;
+    const isController = trackingResult.left?.trigger !== undefined || trackingResult.right?.trigger !== undefined;
+    
     // Add meshes to scene if they exist but aren't added yet
     if (sceneState.leftHandMesh && !sceneState.scene.children.includes(sceneState.leftHandMesh)) {
         sceneState.scene.add(sceneState.leftHandMesh);
@@ -19,14 +40,14 @@ export const updateSTLPositions = (sceneState: SceneState, trackingResult: Track
     }
 
     // Update left hand mesh
-    if (handPositions.left && sceneState.leftHandMesh) {
-        const position = handPositions.left.position;
-        const orientation = handPositions.left.orientation;
-
-        sceneState.leftHandMesh.position.set(position[0], position[1], position[2]);
-        sceneState.leftHandMesh.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
-        // Apply persistent 90° rotation about the mesh's own Z axis
-        if (type == "controller") {
+    if (trackingResult.left && sceneState.leftHandMesh) {
+        const { position, quaternion } = extractPoseFromMatrix(trackingResult.left.targetLocation);
+        
+        sceneState.leftHandMesh.position.copy(position);
+        sceneState.leftHandMesh.quaternion.copy(quaternion);
+        
+        // Apply persistent 90° rotation about the mesh's own Z axis for controllers
+        if (isController) {
             sceneState.leftHandMesh.quaternion.multiply(STL_Z_OFFSET);
         }
         sceneState.leftHandMesh.visible = true;
@@ -35,13 +56,14 @@ export const updateSTLPositions = (sceneState: SceneState, trackingResult: Track
     }
 
     // Update right hand mesh
-    if (handPositions.right && sceneState.rightHandMesh) {
-        const position = handPositions.right.position;
-        const orientation = handPositions.right.orientation;
-        sceneState.rightHandMesh.position.set(position[0], position[1], position[2]);
-        sceneState.rightHandMesh.quaternion.set(orientation[0], orientation[1], orientation[2], orientation[3]);
-        // Apply persistent 90° rotation about the mesh's own Z axis
-        if (type == "controller") {
+    if (trackingResult.right && sceneState.rightHandMesh) {
+        const { position, quaternion } = extractPoseFromMatrix(trackingResult.right.targetLocation);
+        
+        sceneState.rightHandMesh.position.copy(position);
+        sceneState.rightHandMesh.quaternion.copy(quaternion);
+        
+        // Apply persistent 90° rotation about the mesh's own Z axis for controllers
+        if (isController) {
             sceneState.rightHandMesh.quaternion.multiply(STL_Z_OFFSET);
         }
         sceneState.rightHandMesh.visible = true;
@@ -49,8 +71,8 @@ export const updateSTLPositions = (sceneState: SceneState, trackingResult: Track
         sceneState.rightHandMesh.visible = false;
     }
 
-    // Hide meshes if no hand positions
-    if (!handPositions.left && !handPositions.right) {
+    // Hide meshes if no tracking data
+    if (!trackingResult.left && !trackingResult.right) {
         if (sceneState.leftHandMesh) sceneState.leftHandMesh.visible = false;
         if (sceneState.rightHandMesh) sceneState.rightHandMesh.visible = false;
     }
