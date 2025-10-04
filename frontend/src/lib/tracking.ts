@@ -137,12 +137,7 @@ export function handleTracking(frame, referenceSpace, wsRef, lastHandSendRef, pa
   }
   if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
     try {
-      const message = {
-        type: "tracking",
-        left: response.left,
-        right: response.right
-      };
-      wsRef.current.send(JSON.stringify(message));
+      wsRef.current.send(JSON.stringify(response));
     } catch (error) {
       console.log(`Failed to send tracking data: ${error}`);
     }

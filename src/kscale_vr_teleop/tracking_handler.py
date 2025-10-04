@@ -63,7 +63,7 @@ class TrackingHandler:
         self.teleop_core = TeleopCore(websocket, udp_host, udp_port, urdf_logger, ik_solver)
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
     
-    def _handle_target_location(self, tracking_data, side):
+    def _handle_target_location(self, tracking_data, side, tracking_type):
         '''
         Handles the wrist/controller target location matrix (always present).
         Converts from flat 16-element array to 4x4 matrix and applies frame transformations.
@@ -72,12 +72,14 @@ class TrackingHandler:
         target_matrix_flat = np.array(tracking_data['targetLocation'], dtype=np.float32)
         target_matrix = target_matrix_flat.reshape(4, 4).T  # Transpose for column-major to row-major
         
- 
-        direction = -1 if side == 'right' else 1
-        rotation = Rotation.from_euler('z', 90 * direction, degrees=True)
-        rotation_matrix = rotation.as_matrix()
-        # Apply rotation to the orientation part
-        target_matrix[:3, :3] = target_matrix[:3, :3] @ rotation_matrix
+        # Rotate controller matrix 90 degrees around Z-axis for gripper alignment
+        print(f"Tracking type: {tracking_type}")
+        if tracking_type == "controller":
+            direction = -1 if side == 'right' else 1
+            rotation = Rotation.from_euler('z', 90 * direction, degrees=True)
+            rotation_matrix = rotation.as_matrix()
+            # Apply rotation to the orientation part
+            target_matrix[:3, :3] = target_matrix[:3, :3] @ rotation_matrix
         
         # Apply frame transformation to robot coordinate system
         wrist_mat = kbot_xr_to_urdf_frame @ target_matrix
@@ -85,11 +87,12 @@ class TrackingHandler:
         self.teleop_core.update_target_location(side, wrist_mat)
         
     
-    def _handle_joints(self, joints_data, side):
+    def _handle_joints(self, tracking_data, side):
         '''
         Handles finger joint data for hand tracking.
         joints_data is 384 floats (24 finger joints × 16 matrix elements)
         '''
+        joints_data = tracking_data.get("joints", None)
         if joints_data is None or len(joints_data) == 0:
             return
         
@@ -129,15 +132,9 @@ class TrackingHandler:
             tracking_data = event.get(side, None)
             if tracking_data is not None:
                 # Always handle target location (wrist/controller matrix)
-                self._handle_target_location(tracking_data, side)
-                
-                # Handle type-specific data
-                if tracking_type == "controller":
-                    self._handle_buttons(tracking_data, side)
-                else:  # hand tracking
-                    joints = tracking_data.get("joints", None)
-                    if joints:
-                        self._handle_joints(joints, side)
+                self._handle_target_location(tracking_data, side, tracking_type)
+                self._handle_buttons(tracking_data, side)      
+                self._handle_joints(tracking_data, side)
 
         await self.teleop_core.compute_and_send_joints()
 
