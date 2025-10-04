@@ -1,6 +1,6 @@
 // Shared WebXR hand and controller tracking logic
 // Usage: import { handleHandTracking, handleControllerTracking } from './webxrTracking';
-import { SceneState, LocalTargetLocation, TrackingResult, MasterResult, UnifiedTrackingResult } from './types';
+import { SceneState, UnifiedTrackingResult } from './types';
 
 /**
   Function that shifts the position in a transformation matrix along its forward direction.
@@ -13,15 +13,12 @@ import { SceneState, LocalTargetLocation, TrackingResult, MasterResult, UnifiedT
 */
 function shiftMatrixAlongForward(matrix: number[], offset: number): number[] {
   // Matrix is column-major: columns are [right, up, forward, position]
-  // Forward vector is 3rd column (indices 8, 9, 10)
-  // Position is 4th column (indices 12, 13, 14)
   
   const result = [...matrix];
   
-  // Shift position by -forward * offset (negative because we want to move back along forward)
-  result[12] = matrix[12] - matrix[8] * offset;  // X position
-  result[13] = matrix[13] - matrix[9] * offset;  // Y position
-  result[14] = matrix[14] - matrix[10] * offset; // Z position
+  result[12] = matrix[12] - matrix[8] * offset;
+  result[13] = matrix[13] - matrix[9] * offset;
+  result[14] = matrix[14] - matrix[10] * offset; 
   
   return result;
 }

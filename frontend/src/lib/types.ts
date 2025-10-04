@@ -18,32 +18,14 @@ export interface AppConnectionMessage {
   robot_ip: string;
 }
 
-// Tracking types
-export type LocalTargetLocation = {
-  left: {
-    position: number[];
-    orientation: number[];
-
-  } | null;
-  right: {
-    position: number[];
-    orientation: number[];
-  } | null;
-};
-
-export type TrackingResult = {
-  type: "hand" | "controller";
-  handPositions: LocalTargetLocation;
-  payload: any;
-};
 
 export type UnifiedTrackingResult = {
   type: "hand" | "controller";
-  right: MasterResult | null
-  left: MasterResult | null
+  right: TrackingResult | null
+  left: TrackingResult | null
 };
 
-export type MasterResult = {
+export type TrackingResult = {
   targetLocation: number[]
   joints: number[]
   joystickX?: number
