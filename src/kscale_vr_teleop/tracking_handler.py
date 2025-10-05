@@ -73,7 +73,6 @@ class TrackingHandler:
         target_matrix = target_matrix_flat.reshape(4, 4).T  # Transpose for column-major to row-major
         
         # Rotate controller matrix 90 degrees around Z-axis for gripper alignment
-        print(f"Tracking type: {tracking_type}")
         if tracking_type == "controller":
             direction = -1 if side == 'right' else 1
             rotation = Rotation.from_euler('z', 90 * direction, degrees=True)
@@ -131,7 +130,6 @@ class TrackingHandler:
         for side in ["left", "right"]:
             tracking_data = event.get(side, None)
             if tracking_data is not None:
-                # Always handle target location (wrist/controller matrix)
                 self._handle_target_location(tracking_data, side, tracking_type)
                 self._handle_buttons(tracking_data, side)      
                 self._handle_joints(tracking_data, side)

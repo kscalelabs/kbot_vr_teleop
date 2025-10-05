@@ -34,6 +34,7 @@ export type TrackingResult = {
   grip?: number
   buttons?: boolean[]
 }
+
 // Three.js scene state
 export type SceneState = {
   scene: THREE.Scene | null;

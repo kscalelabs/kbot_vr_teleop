@@ -9,6 +9,26 @@ class Commander16:
         self.UDP_IP = udp_ip
         self.UDP_PORT = udp_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.cmds = {
+            "xvel": 0, # pushing up or down on right joystick is "X" axis for policies
+            "yvel": 0,
+            "yawrate": 0,
+            "baseheight":0,
+            "baseroll": 0,
+            "basepitch": 0,
+            "rshoulderpitch": 0,
+            "rshoulderroll": 0,
+            "rshoulderyaw": 0,  
+            "relbowpitch": 0,  
+            "rwristroll": 0, 
+            "rwristgripper": 0,  
+            "lshoulderpitch": 0,  
+            "lshoulderroll": 0,  
+            "lshoulderyaw": 0,  
+            "lelbowpitch": 0,  
+            "lwristroll": 0,  
+            "lwristgripper": 0,  
+        }
     
     def add_joint_bias(self, commands):
         commands["rshoulderroll"] += math.radians(10.0)
@@ -16,34 +36,13 @@ class Commander16:
         commands["rwristgripper"] += math.radians(-8.0)
         commands["lshoulderroll"] += math.radians(-10.0)
         commands["lelbowpitch"] += math.radians(90.0)
-        commands["lwristgripper"] += math.radians(-25.0)
-             
+        commands["lwristgripper"] += math.radians(-25.0)          
         return commands
         
-    def build_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
-        left_gripper = None 
-        if len(left_arm_angles) > 5:
-            # Map 0-1 input to -25° to +25° radians with left gripper offset
-            input_val = float(left_arm_angles[5])
-            gripper_range_min = math.radians(-25)   # radians (fully open)
-            gripper_range_max = math.radians(25.0)  # radians (fully closed)
-            offset = math.radians(-8)  # Left grippers offset
-            mapped_value = gripper_range_max - input_val * (gripper_range_max - gripper_range_min)
-            left_gripper = mapped_value + offset
-
-        right_gripper = None
-        if len(right_arm_angles) > 5:
-            # Map 0-1 input to -25° to +25° radians with right gripper offset
-            input_val = float(right_arm_angles[5])
-            gripper_range_min = math.radians(-25)   # radians (fully open)
-            gripper_range_max = math.radians(25.0)  # radians (fully closed)
-            offset = math.radians(-25)  # Right gripper offset
-            mapped_value = gripper_range_max - input_val * (gripper_range_max - gripper_range_min)
-            right_gripper = mapped_value + offset
-
-        new_commands = {
+    def update_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
+        self.cmds = {
             "xvel": right_joystick[1], # pushing up or down on right joystick is "X" axis for policies
-            "yvel": -right_joystick[0],
+            "yvel": -right_joystick[0], 
             "yawrate": -left_joystick[0],
             "baseheight":0,
             "baseroll": 0,
@@ -53,20 +52,16 @@ class Commander16:
             "rshoulderyaw": right_arm_angles[2],  
             "relbowpitch": right_arm_angles[3],  
             "rwristroll": right_arm_angles[4], 
-            "rwristgripper": right_gripper,  
+            "rwristgripper": right_arm_angles[5],  
             "lshoulderpitch": left_arm_angles[0],  
             "lshoulderroll": left_arm_angles[1],  
             "lshoulderyaw": left_arm_angles[2],  
             "lelbowpitch": left_arm_angles[3],  
             "lwristroll": left_arm_angles[4],  
-            "lwristgripper": left_gripper,  
+            "lwristgripper": left_arm_angles[5],  
         }
 
-
-
-        return (json.dumps({"commands": self.add_joint_bias(new_commands)}) + "\n").encode("utf-8")
-
-    def send_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
-        new_commands = self.build_commands(right_arm_angles, left_arm_angles, right_joystick, left_joystick)
+    def send_commands(self):
+        new_commands =  (json.dumps({"commands": self.add_joint_bias(self.cmds)}) + "\n").encode("utf-8")
         print(new_commands)
         self.sock.sendto(new_commands, (self.UDP_IP, self.UDP_PORT)) 

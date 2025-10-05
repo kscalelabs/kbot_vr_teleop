@@ -6,6 +6,7 @@ import rerun as rr
 from line_profiler import profile
 import json
 import time
+import math
 
 class TeleopCore:
     def __init__(self, websocket, udp_host, udp_port, urdf_logger, ik_solver):
@@ -108,8 +109,15 @@ class TeleopCore:
     
     def _compute_gripper_from_controllers(self):
         # Placeholder: map controller trigger/grip values to gripper joint positions
-        right_gripper_joint =  (1.0 - self.right_gripper_value)  # Inverted: 1.0 = closed, 0.0 = open
-        left_gripper_joint = (1.0 - self.left_gripper_value)
+        gripper_range = math.radians(50)
+        gripper_start = math.radians(25)
+        right_gripper_joint = gripper_start - (gripper_range * (1.0 - self.right_gripper_value))
+        left_gripper_joint = gripper_start - (gripper_range * (1.0 - self.left_gripper_value))
+        
+        # Log gripper positions as scalars for timeseries visualization
+        rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
+        rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
+
         return right_gripper_joint, left_gripper_joint
 
     @profile
@@ -156,10 +164,6 @@ class TeleopCore:
         for i, finger in enumerate(['thumb', 'index', 'middle', 'ring', 'pinky', 'thumb_yaw']):
             rr.log(f"plots/finger_angles/right/{finger}", rr.Scalars(right_finger_angles[i]))
             rr.log(f"plots/finger_angles/left/{finger}", rr.Scalars(left_finger_angles[i]))
-
-        # Log gripper positions as scalars for timeseries visualization
-        rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
-        rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
 
         # Compute actual end effector poses using forward kinematics
         # Combine right and left arm joints (5 each) into the expected 10-element array
@@ -216,29 +220,23 @@ class TeleopCore:
         self._check_message_timing()
         if (right_distance < 0.025 and left_distance < 0.025):
             self.converged = True
-        if not self.converged:
-            return (None, None, None, None, None, None)
-        await self.websocket.send(json.dumps(payload))
-        return (right_arm_joints.tolist() + [right_gripper_joint],
+        if self.converged:
+            self.log_joint_angles(right_arm_joints, left_arm_joints)
+            self.kinfer_command_handler.update_commands (
+                right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
-                right_finger_angles,
-                left_finger_angles, 
                 (self.right_joystick_x, self.right_joystick_y),
-                (self.left_joystick_x, self.left_joystick_y))
+                (self.left_joystick_x, self.left_joystick_y)
+                )
+            await self.websocket.send(json.dumps(payload))
+ 
 
     async def compute_and_send_joints(self):
-        right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles, right_joystick, left_joystick = await self.compute_joint_angles()
-        if right_arm_joints is None or left_arm_joints is None:
-            return
-        self.log_joint_angles(right_arm_joints, left_arm_joints)
-        self._send_kinfer_commands(right_arm_joints, left_arm_joints, right_joystick, left_joystick)
+        await self.compute_joint_angles()
+        self.kinfer_command_handler.send_commands()
 
-    def _send_kinfer_commands(self, right_arm: list, left_arm: list, right_joystick: tuple, left_joystick: tuple):
-        '''
-        Takes input in the same format as compute_joint_angles arm output
-        '''
 
-        self.kinfer_command_handler.send_commands(right_arm, left_arm, right_joystick, left_joystick)
+        
 
     # def send_kos_commands(self, right_arm: list, left_arm: list):
     #     '''
