@@ -1,15 +1,13 @@
 import numpy as np
 from kscale_vr_teleop.command_conn import Commander16
-# from kscale_vr_teleop.udp_conn import UDPHandler
 from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
-import rerun as rr
 from line_profiler import profile
 import json
 import time
 import math
 
 class TeleopCore:
-    def __init__(self, websocket, udp_host, udp_port, urdf_logger, ik_solver):
+    def __init__(self, websocket, udp_host, udp_port, ik_solver):
         self.websocket = websocket
         self.head_matrix = np.eye(4, dtype=np.float32)
         self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
@@ -27,7 +25,6 @@ class TeleopCore:
         self.left_wrist_pose[:3,:3] = default_wrist_rotation
         self.right_wrist_pose[:3,:3] = default_wrist_rotation
 
-        self.urdf_logger = urdf_logger
         self.ik_solver = ik_solver
 
         self.base_to_head_transform = np.eye(4)
@@ -64,10 +61,8 @@ class TeleopCore:
     def update_target_location(self, side: str, pose: np.ndarray):
         if side == 'left':
             self.left_wrist_pose = pose
-            rr.log('left_wrist', rr.Transform3D(translation=pose[:3, 3], mat3x3=pose[:3, :3], axis_length=0.05))
         else:
             self.right_wrist_pose = pose
-            rr.log('right_wrist', rr.Transform3D(translation=pose[:3, 3], mat3x3=pose[:3, :3], axis_length=0.05))
 
     def update_buttons(self, side: str, gripper_value: float, joystick_x: float, joystick_y: float):
         if side == 'left':
@@ -95,10 +90,7 @@ class TeleopCore:
         
         self.last_message_time = current_time
     
-    def log_joint_angles(self, right_arm: list, left_arm: list):
-        new_config = {k: right_arm[i] for i, k in enumerate(self.ik_solver.active_joints[:5])}
-        new_config.update({k: left_arm[i] for i, k in enumerate(self.ik_solver.active_joints[5:])})
-        self.urdf_logger.log(new_config)
+    
     
     def _compute_gripper_from_fingers(self):
         right_finger_spacing = np.linalg.norm(self.right_finger_poses[8,:3,3] - self.right_finger_poses[3,:3,3])
@@ -108,16 +100,12 @@ class TeleopCore:
         return right_gripper_joint, left_gripper_joint
     
     def _compute_gripper_from_controllers(self):
-        # Placeholder: map controller trigger/grip values to gripper joint positions
+        # Map controller trigger/grip values to gripper joint positions
         gripper_range = math.radians(50)
         gripper_start = math.radians(25)
         right_gripper_joint = gripper_start - (gripper_range * (1.0 - self.right_gripper_value))
         left_gripper_joint = gripper_start - (gripper_range * (1.0 - self.left_gripper_value))
         
-        # Log gripper positions as scalars for timeseries visualization
-        rr.log("plots/gripper_positions/Right Gripper", rr.Scalars(right_gripper_joint))
-        rr.log("plots/gripper_positions/Left Gripper", rr.Scalars(left_gripper_joint))
-
         return right_gripper_joint, left_gripper_joint
 
     @profile
@@ -132,9 +120,8 @@ class TeleopCore:
 
         hand_target_left[2, 3] = max(hand_target_left[2, 3], -0.25)
         hand_target_right[2, 3] = max(hand_target_right[2, 3], -0.25)
-        rr.log('target_right', rr.Transform3D(translation=hand_target_right[:3, 3], mat3x3=hand_target_right[:3, :3], axis_length=0.1))
-        rr.log('target_left', rr.Transform3D(translation=hand_target_left[:3, 3], mat3x3=hand_target_left[:3, :3], axis_length=0.1))
-        # clamp hand targets z coordinate to be above -0.2
+        
+        # Compute inverse kinematics
         joints = self.ik_solver.inverse_kinematics(np.array([hand_target_right, hand_target_left]))
         # Convert JAX array to NumPy for faster slicing operations
         joints = np.asarray(joints)
@@ -160,11 +147,6 @@ class TeleopCore:
         right_finger_angles = np.clip(right_finger_angles, 0, 1)
         left_finger_angles = np.clip(left_finger_angles, 0, 1)
 
-        # Log finger angles for timeseries visualization
-        for i, finger in enumerate(['thumb', 'index', 'middle', 'ring', 'pinky', 'thumb_yaw']):
-            rr.log(f"plots/finger_angles/right/{finger}", rr.Scalars(right_finger_angles[i]))
-            rr.log(f"plots/finger_angles/left/{finger}", rr.Scalars(left_finger_angles[i]))
-
         # Compute actual end effector poses using forward kinematics
         # Combine right and left arm joints (5 each) into the expected 10-element array
         all_joint_angles = np.concatenate([right_arm_joints, left_arm_joints])
@@ -174,27 +156,11 @@ class TeleopCore:
         actual_right_pose = actual_poses[0]  # First end effector (right arm)
         actual_left_pose = actual_poses[1]   # Second end effector (left arm)
         
-        # Log actual end effector poses for visualization
-        rr.log('actual_right', rr.Transform3D(
-            translation=actual_right_pose[:3, 3], 
-            mat3x3=actual_right_pose[:3, :3], 
-            axis_length=0.1
-        ))
-        rr.log('actual_left', rr.Transform3D(
-            translation=actual_left_pose[:3, 3], 
-            mat3x3=actual_left_pose[:3, :3], 
-            axis_length=0.05
-        ))
-        
         # Calculate distances between target and actual positions
         # Target positions: hand_target_left/right (what VR hands want)
         # Actual positions: actual_left/right_pose (where robot actually is)
         right_distance = np.linalg.norm(hand_target_right[:3, 3] - actual_right_pose[:3, 3])
         left_distance = np.linalg.norm(hand_target_left[:3, 3] - actual_left_pose[:3, 3])
-        
-        # Log distances for visualization
-        rr.log("plots/tracking_accuracy/Right Distance", rr.Scalars(right_distance))
-        rr.log("plots/tracking_accuracy/Left Distance", rr.Scalars(left_distance))
         
         payload = {
             "type": "kinematics",

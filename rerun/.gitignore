@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Rerun log files
+*.rrd
+
+# IDE
+.vscode/
+.idea/
+
