@@ -1,8 +1,6 @@
 import json
 import socket
 import math
-from dataclasses import dataclass
-import numpy as np
 
 class Commander16:
     def __init__(self, udp_ip: str = "localhost", udp_port: int = 10000):
@@ -63,5 +61,4 @@ class Commander16:
 
     def send_commands(self):
         new_commands =  (json.dumps({"commands": self.add_joint_bias(self.cmds)}) + "\n").encode("utf-8")
-        print(new_commands)
         self.sock.sendto(new_commands, (self.UDP_IP, self.UDP_PORT)) 

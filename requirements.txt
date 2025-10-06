@@ -12,4 +12,3 @@ tqdm
 trimesh
 urdfdom_py
 websockets
-vuer[all]

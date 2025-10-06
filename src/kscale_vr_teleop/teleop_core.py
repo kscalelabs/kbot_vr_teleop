@@ -1,36 +1,21 @@
 import numpy as np
-from kscale_vr_teleop.command_conn import Commander16
-from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
-from line_profiler import profile
 import json
 import time
 import math
 
+from line_profiler import profile
+
+from kscale_vr_teleop.command_conn import Commander16
+from kscale_vr_teleop.hand_inverse_kinematics import calculate_hand_joints_no_ik
+
 class TeleopCore:
     def __init__(self, websocket, udp_host, udp_port, ik_solver):
+        self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
         self.websocket = websocket
-        self.head_matrix = np.eye(4, dtype=np.float32)
-        self.right_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
-        self.left_finger_poses = np.zeros((24, 4, 4), dtype=np.float32)
-        self.right_wrist_pose = np.eye(4,dtype=np.float32)
-        self.left_wrist_pose = np.eye(4,dtype=np.float32)
-
-        self.left_wrist_pose[:3,3] = np.array([0.2, 0.2, -0.4])
-        self.right_wrist_pose[:3,3] = np.array([0.2, -0.2, -0.4])
-        default_wrist_rotation = np.array([
-            [0, 0, -1],
-            [-1, 0, 0],
-            [0, 1, 0]
-        ])
-        self.left_wrist_pose[:3,:3] = default_wrist_rotation
-        self.right_wrist_pose[:3,:3] = default_wrist_rotation
-
         self.ik_solver = ik_solver
 
         self.base_to_head_transform = np.eye(4)
         self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
-
-        self.kinfer_command_handler = Commander16(udp_ip=udp_host, udp_port=udp_port)
 
         # Gripper values from controller inputs (0.0 to 1.0)
         self.right_gripper_value = 1.0
@@ -47,9 +32,6 @@ class TeleopCore:
         
         # Track message timing to detect gaps (unpause)
         self.last_message_time = None
-        
-    def update_head(self, matrix: np.ndarray):
-        self.head_matrix = matrix
 
     def update_joints(self, side: str, fingers: np.ndarray):
         if side == 'left':
@@ -76,7 +58,10 @@ class TeleopCore:
         self.use_fingers = False
 
     def _check_message_timing(self):
-        """Check time between messages and reset converged flag if gap > 0.5s"""
+        """
+        Check time between messages and reset converged flag if gap > 0.5s.
+        The IK solver uses the previous solution as a warm start, so it needs time to converge if the position jumps.
+        """
         current_time = time.time()
         
         if self.last_message_time is not None:
@@ -85,14 +70,13 @@ class TeleopCore:
             if time_delta >= 0.5:
                 print(f"Message gap detected: {time_delta:.3f}s - resetting converged flag")
                 self.converged = False
-            # else:
-            #     print(f"Message received after {time_delta:.3f}s")
         
         self.last_message_time = current_time
     
-    
-    
     def _compute_gripper_from_fingers(self):
+        '''
+        Map finger spacing to gripper joint positions
+        '''
         right_finger_spacing = np.linalg.norm(self.right_finger_poses[8,:3,3] - self.right_finger_poses[3,:3,3])
         right_gripper_joint = 0.068*np.clip(right_finger_spacing/0.15, 0, 1)
         left_finger_spacing = np.linalg.norm(self.left_finger_poses[8,:3,3] - self.left_finger_poses[3,:3,3])
@@ -100,6 +84,9 @@ class TeleopCore:
         return right_gripper_joint, left_gripper_joint
     
     def _compute_gripper_from_controllers(self):
+        '''
+        Map controller trigger/grip values to gripper joint positions
+        '''
         # Map controller trigger/grip values to gripper joint positions
         gripper_range = math.radians(50)
         gripper_start = math.radians(25)
@@ -111,9 +98,9 @@ class TeleopCore:
     @profile
     async def compute_joint_angles(self):
         '''
-        Returns (right_arm_joints, left_arm_joints, right_finger_angles, left_finger_angles)
-        where right_arm_joints and left_arm_joints are lists of 6 floats (5 arm joints + gripper),
-        and right_finger_angles, left_finger_angles are np.ndarray of 6 floats (thumb_metacarpal + thumb + 4 fingers).
+        Peforms IK on left_wrist_pose and right_writst_pose.
+        Updates all the commands in the kinfer_command_handler.
+        Sends kinematics info back to client, including joint angles and error distance.
         '''
         hand_target_left = self.base_to_head_transform @ self.left_wrist_pose
         hand_target_right = self.base_to_head_transform @ self.right_wrist_pose
@@ -157,8 +144,6 @@ class TeleopCore:
         actual_left_pose = actual_poses[1]   # Second end effector (left arm)
         
         # Calculate distances between target and actual positions
-        # Target positions: hand_target_left/right (what VR hands want)
-        # Actual positions: actual_left/right_pose (where robot actually is)
         right_distance = np.linalg.norm(hand_target_right[:3, 3] - actual_right_pose[:3, 3])
         left_distance = np.linalg.norm(hand_target_left[:3, 3] - actual_left_pose[:3, 3])
         
@@ -187,7 +172,6 @@ class TeleopCore:
         if (right_distance < 0.025 and left_distance < 0.025):
             self.converged = True
         if self.converged:
-            self.log_joint_angles(right_arm_joints, left_arm_joints)
             self.kinfer_command_handler.update_commands (
                 right_arm_joints.tolist() + [right_gripper_joint],
                 left_arm_joints.tolist() + [left_gripper_joint],
@@ -196,7 +180,6 @@ class TeleopCore:
                 )
             await self.websocket.send(json.dumps(payload))
  
-
     async def compute_and_send_joints(self):
         await self.compute_joint_angles()
         self.kinfer_command_handler.send_commands()
