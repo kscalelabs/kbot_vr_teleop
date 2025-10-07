@@ -17,11 +17,9 @@ import trimesh
 from urdf_parser_py import urdf as urdf_parser
 from pathlib import Path
 from line_profiler import profile
-from rerun.datatypes import RotationAxisAngle, Angle
 
 class URDFLogger:
     """Class to log a URDF to Rerun."""
-
     def __init__(self, filepath: str, root_path: str = "") -> None:
         urdf_contents = open(filepath, 'r').read()
         urdf_parent_path =Path(filepath).absolute().parent
@@ -35,7 +33,6 @@ class URDFLogger:
         self.joint_transform_set = set()
         rr.log(self.root_path + "", rr.ViewCoordinates.RIGHT_HAND_Z_UP, static=True)  # default ROS convention
     
-
     def link_entity_path(self, link: urdf_parser.Link) -> str:
         root_name = self.urdf.get_root()
         link_names = self.urdf.get_chain(root_name, link.name)[0::2]  # skip the joints
@@ -108,7 +105,6 @@ class URDFLogger:
             joint_axis = joint.axis if joint.axis is not None else [1, 0, 0]
             rr.log(self.root_path + entity_path, rr.Transform3D.from_fields(quaternion=st.Rotation.from_rotvec(np.array(joint_axis) * angle).as_quat()))
 
-
     def load_mesh(self, path):
         if path not in self.mesh_data_cache:
             self.mesh_data_cache[path] = trimesh.load_mesh(path)
@@ -178,7 +174,6 @@ class URDFLogger:
             log_trimesh(self.root_path + entity_path, mesh)
         self.meshes_cache[entity_path] = mesh
 
-
 def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
     vertex_colors = albedo_texture = vertex_texcoords = None
     if isinstance(mesh.visual, trimesh.visual.color.ColorVisuals):
@@ -210,7 +205,6 @@ def log_trimesh(entity_path: str, mesh: trimesh.Trimesh) -> None:
         static=True,
     )
 
-
 def resolve_ros_path(path: str) -> str:
     if path.startswith("package://"):
         path = pathlib.Path(path)
@@ -231,7 +225,6 @@ def resolve_ros_path(path: str) -> str:
     else:
         return path
 
-
 def resolve_ros2_package(package_name: str) -> Optional[str]:
     try:
         import ament_index_python
@@ -243,7 +236,6 @@ def resolve_ros2_package(package_name: str) -> Optional[str]:
     except ImportError:
         return None
 
-
 def resolve_ros1_package(package_name: str) -> str:
     try:
         import rospkg
@@ -254,7 +246,6 @@ def resolve_ros1_package(package_name: str) -> str:
             return None
     except ImportError:
         return None
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(

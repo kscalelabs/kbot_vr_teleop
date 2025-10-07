@@ -5,7 +5,6 @@ from typing import Optional
 import logging
 from kscale_vr_teleop.tracking_handler import TrackingHandler
 from kscale_vr_teleop._assets import ASSETS_DIR
-from kscale_vr_teleop.analysis.rerun_loader_urdf import URDFLogger
 from kscale_vr_teleop.jax_ik import RobotInverseKinematics
 
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 tracking_handler = None
 urdf_path  = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
-urdf_logger = URDFLogger(urdf_path)
 ik_solver = RobotInverseKinematics(urdf_path, ['PRT0001', 'PRT0001_2'], 'base')
 
 class SimpleConnection:
@@ -174,7 +172,7 @@ async def handler(websocket):
         if role == "app":
             await handle_app(websocket, robot_ip)
         elif role == "teleop":
-            tracking_handler = TrackingHandler(websocket, udp_host=robot_ip, urdf_logger=urdf_logger, ik_solver=ik_solver)
+            tracking_handler = TrackingHandler(websocket, udp_host=robot_ip, ik_solver=ik_solver)
             await handle_teleop(websocket)
         else:
             await websocket.send(json.dumps({"type": "error", "error": "Invalid role"}))
