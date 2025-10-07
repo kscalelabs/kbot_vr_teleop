@@ -61,7 +61,7 @@ class Commander16:
 
     def send_commands(self):
         new_commands =  (json.dumps({"commands": self.add_joint_bias(self.cmds)}) + "\n").encode("utf-8")
-        self.sock.sendto(new_commands, (self.UDP, self.UDP_PORT)) 
+        self.sock.sendto(new_commands, (self.UDP_IP, self.UDP_PORT)) 
 
         # new_commands =  (json.dumps({"commands": self.cmds}) + "\n").encode("utf-8")
         # self.sock.sendto(new_commands, ("192.168.1.228", 10000)) 
