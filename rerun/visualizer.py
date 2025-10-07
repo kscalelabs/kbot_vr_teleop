@@ -37,7 +37,7 @@ except ImportError:
 
 
 class RerunUDPVisualizer:
-    def __init__(self, urdf_path: str, host: str = "0.0.0.0", port: int = 10002):
+    def __init__(self, urdf_path: str, host: str = "0.0.0.0"):
         """
         Initialize the Rerun visualizer with UDP socket.
         
@@ -48,7 +48,7 @@ class RerunUDPVisualizer:
         """
         self.urdf_path = urdf_path
         self.host = host
-        self.port = port
+        self.port = 10000
         
         # Initialize Rerun
         logs_folder = Path(f'~/.vr_teleop_logs/{time.strftime("%Y-%m-%d")}/').expanduser()
@@ -64,8 +64,8 @@ class RerunUDPVisualizer:
         rr.log('origin', rr.Transform3D(translation=[0, 0, 0], axis_length=0.1), static=True)
         
         # Set up timeseries plots
-        rr.log("plots/gripper_positions", rr.SeriesLine(color=[255, 0, 0], name="Right Gripper"), static=True)
-        rr.log("plots/gripper_positions", rr.SeriesLine(color=[0, 0, 255], name="Left Gripper"), static=True)
+        rr.log("plots/gripper_positions", rr.SeriesLines(colors=[255, 0, 0], names="Right Gripper"), static=True)
+        rr.log("plots/gripper_positions", rr.SeriesLines(colors=[0, 0, 255], names="Left Gripper"), static=True)
         
         # Initialize URDF logger
         self.urdf_logger = URDFLogger(urdf_path, root_path="robot")
@@ -124,9 +124,9 @@ class RerunUDPVisualizer:
         
         # Log gripper values if available
         if "rwristgripper" in commands:
-            rr.log("plots/gripper_positions/Right Gripper", rr.Scalar(commands["rwristgripper"]))
+            rr.log("plots/gripper_positions/Right Gripper", commands["rwristgripper"])
         if "lwristgripper" in commands:
-            rr.log("plots/gripper_positions/Left Gripper", rr.Scalar(commands["lwristgripper"]))
+            rr.log("plots/gripper_positions/Left Gripper", commands["lwristgripper"])
             
         return joint_angles
     
@@ -149,7 +149,7 @@ class RerunUDPVisualizer:
                     # Receive UDP message
                     data, addr = self.sock.recvfrom(4096)
                     message = json.loads(data.decode('utf-8'))
-                    
+                    print(message)
                     # Parse joint angles from message
                     joint_angles = self._parse_message(message)
                     
@@ -219,7 +219,7 @@ Examples:
     print(f"\n🤖 Using URDF: {urdf_path}\n")
     
     # Create and run visualizer
-    visualizer = RerunUDPVisualizer(urdf_path, host=args.host, port=args.port)
+    visualizer = RerunUDPVisualizer(urdf_path, host=args.host)
     visualizer.run()
 
 
