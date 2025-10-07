@@ -20,11 +20,11 @@ hand_xr_to_urdf_frame = np.array([
 ], dtype=np.float32)
 
 class TrackingHandler:
-    def __init__(self, websocket, udp_host, urdf_logger, ik_solver=None, udp_port=10000):
+    def __init__(self, websocket, udp_host, ik_solver=None, udp_port=10000):
         self.udp_host = udp_host
         self.udp_port = udp_port
 
-        self.teleop_core = TeleopCore(websocket, udp_host, udp_port, urdf_logger, ik_solver)
+        self.teleop_core = TeleopCore(websocket, udp_host, udp_port, ik_solver)
         self.finger_server = FingerUDPHandler(udp_host=udp_host, udp_port=10001)
     
     def _handle_target_location(self, tracking_data, side, tracking_type):
@@ -49,7 +49,6 @@ class TrackingHandler:
         
         self.teleop_core.update_target_location(side, wrist_mat)
         
-    
     def _handle_joints(self, tracking_data, side):
         '''
         Handles finger joint data for hand tracking.
