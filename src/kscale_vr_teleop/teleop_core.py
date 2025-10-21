@@ -16,11 +16,13 @@ class TeleopCore:
 
         self.base_to_head_transform = np.eye(4)
         self.base_to_head_transform[:3,3] = np.array([0, 0, 0.25])
-
+        self.right_wrist_pose = np.eye(4,dtype=np.float32)
+        self.left_wrist_pose = np.eye(4,dtype=np.float32)
         # Gripper values from controller inputs (0.0 to 1.0)
         self.right_gripper_value = 1.0
         self.left_gripper_value = 1.0
-
+        self.left_wrist_pose[:3,3] = np.array([0.2, 0.2, -0.4])
+        self.right_wrist_pose[:3,3] = np.array([0.2, -0.2, -0.4])
         # Joystick values from controller inputs
         self.right_joystick_x = 0.0
         self.right_joystick_y = 0.0
@@ -32,6 +34,42 @@ class TeleopCore:
         
         # Track message timing to detect gaps (unpause)
         self.last_message_time = None
+        
+        # Initialize IK solver to home position
+        self.reset_to_home()
+    
+    def reset_to_home(self):
+        """
+        Reset IK solver to home position for better warm start convergence.
+        
+        Home position (in radians):
+        - Right shoulder roll: -10 degrees
+        - Right elbow pitch: 90 degrees
+        - Left shoulder roll: 10 degrees
+        - Left elbow pitch: -90 degrees
+        - All other joints: 0
+        
+        Joint indices in IK solver:
+        0: dof_right_shoulder_pitch_03
+        1: dof_right_shoulder_roll_03
+        2: dof_right_shoulder_yaw_02
+        3: dof_right_elbow_02
+        4: dof_right_wrist_00
+        5: dof_left_shoulder_pitch_03
+        6: dof_left_shoulder_roll_03
+        7: dof_left_shoulder_yaw_02
+        8: dof_left_elbow_02
+        9: dof_left_wrist_00
+        """
+        home_position = np.zeros(10, dtype=np.float32)
+        home_position[1] = math.radians(-10.0)  # Right shoulder roll
+        home_position[3] = math.radians(90.0)   # Right elbow pitch
+        home_position[6] = math.radians(10.0)   # Left shoulder roll
+        home_position[8] = math.radians(-90.0)  # Left elbow pitch
+        
+        # Set the IK solver's last solution to home position
+        import jax.numpy as jnp
+        self.ik_solver.last_solution = jnp.array(home_position)
 
     def update_joints(self, side: str, fingers: np.ndarray):
         if side == 'left':
@@ -88,15 +126,11 @@ class TeleopCore:
         Map controller trigger/grip values to gripper joint positions
         '''
         # Map controller trigger/grip values to gripper joint positions
-        gripper_range = math.radians(50)
-        gripper_start = math.radians(25)
-        right_gripper_joint = gripper_start - (gripper_range * (1.0 - self.right_gripper_value))
-        left_gripper_joint = gripper_start - (gripper_range * (1.0 - self.left_gripper_value))
-        
-        return right_gripper_joint, left_gripper_joint
+    
+        return self.right_gripper_value * 0.9, self.left_gripper_value * 0.9  
 
     @profile
-    async def compute_joint_angles(self):
+    async def compute_and_send_joints(self):
         '''
         Peforms IK on left_wrist_pose and right_writst_pose.
         Updates all the commands in the kinfer_command_handler.
@@ -169,7 +203,7 @@ class TeleopCore:
             }
         }
         self._check_message_timing()
-        if (right_distance < 0.025 and left_distance < 0.025):
+        if (right_distance < 0.05 and left_distance < 0.05):
             self.converged = True
         if self.converged:
             self.kinfer_command_handler.update_commands (
@@ -179,10 +213,9 @@ class TeleopCore:
                 (self.left_joystick_x, self.left_joystick_y)
                 )
             await self.websocket.send(json.dumps(payload))
- 
-    async def compute_and_send_joints(self):
-        await self.compute_joint_angles()
-        self.kinfer_command_handler.send_commands()
+            self.kinfer_command_handler.send_commands()
+
+        
 
 
         

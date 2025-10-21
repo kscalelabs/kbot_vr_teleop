@@ -19,22 +19,20 @@ class Commander16:
             "rshoulderyaw": 0,  
             "relbowpitch": 0,  
             "rwristroll": 0, 
-            "rwristgripper": 0,  
+            "rgripper": 0,  
             "lshoulderpitch": 0,  
             "lshoulderroll": 0,  
             "lshoulderyaw": 0,  
             "lelbowpitch": 0,  
             "lwristroll": 0,  
-            "lwristgripper": 0,  
+            "lgripper": 0,  
         }
     
     def add_joint_bias(self, commands):
         commands["rshoulderroll"] += math.radians(10.0)
         commands["relbowpitch"] += math.radians(-90.0)
-        commands["rwristgripper"] += math.radians(-8.0)
         commands["lshoulderroll"] += math.radians(-10.0)
-        commands["lelbowpitch"] += math.radians(90.0)
-        commands["lwristgripper"] += math.radians(-25.0)          
+        commands["lelbowpitch"] += math.radians(90.0)      
         return commands
         
     def update_commands(self, right_arm_angles, left_arm_angles, right_joystick, left_joystick):
@@ -50,17 +48,17 @@ class Commander16:
             "rshoulderyaw": right_arm_angles[2],  
             "relbowpitch": right_arm_angles[3],  
             "rwristroll": right_arm_angles[4], 
-            "rwristgripper": right_arm_angles[5],  
+            "rgripper": right_arm_angles[5],  
             "lshoulderpitch": left_arm_angles[0],  
             "lshoulderroll": left_arm_angles[1],  
             "lshoulderyaw": left_arm_angles[2],  
             "lelbowpitch": left_arm_angles[3],  
             "lwristroll": left_arm_angles[4],  
-            "lwristgripper": left_arm_angles[5],  
+            "lgripper": left_arm_angles[5],  
         }
 
     def send_commands(self):
-        new_commands =  (json.dumps({"commands": self.add_joint_bias(self.cmds)}) + "\n").encode("utf-8")
+        new_commands =  (json.dumps({"commands": self.cmds}) + "\n").encode("utf-8")
         self.sock.sendto(new_commands, (self.UDP_IP, self.UDP_PORT)) 
 
         # new_commands =  (json.dumps({"commands": self.cmds}) + "\n").encode("utf-8")

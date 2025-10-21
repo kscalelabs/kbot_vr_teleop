@@ -142,6 +142,7 @@ async def handle_app(websocket, robot_ip: str):
 async def handle_teleop(websocket):
     """Handle teleop connection - forwards messages over UDP"""
     global tracking_handler
+    tracking_handler.teleop_core.reset_to_home()
     try:
         async for message in websocket:
             try:

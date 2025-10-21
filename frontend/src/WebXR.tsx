@@ -26,6 +26,7 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
   const xrSessionRef = useRef<XRSession | null>(null);
   const [joystickScale, setJoystickScale] = useState(0.1);
   const [pauseCommands, setPauseCommands] = useState(true);
+  
   // Single state object for all scene-related refs
   const sceneStateRef = useRef<SceneState>(DEFAULT_SCENE_STATE);
 
@@ -183,7 +184,6 @@ export default function VRViewer({ stream, url, udpHost }: VRViewerProps) {
       100  // Far plane
     );
 
-    // Use Three's XR render loop to obtain XRFrame
     renderer.setAnimationLoop((time, frame) => {
       if (!frame || !sceneStateRef.current.scene) return;
 

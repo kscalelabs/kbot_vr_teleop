@@ -37,7 +37,7 @@ except ImportError:
 
 
 class RerunUDPVisualizer:
-    def __init__(self, urdf_path: str, host: str = "0.0.0.0"):
+    def __init__(self, urdf_path: str):
         """
         Initialize the Rerun visualizer with UDP socket.
         
@@ -47,8 +47,6 @@ class RerunUDPVisualizer:
             port: UDP port to listen on (default: 10002 to avoid conflicts)
         """
         self.urdf_path = urdf_path
-        self.host = host
-        self.port = 10000
         
         # Initialize Rerun
         logs_folder = Path(f'~/.vr_teleop_logs/{time.strftime("%Y-%m-%d")}/').expanduser()
@@ -63,10 +61,6 @@ class RerunUDPVisualizer:
         # Set up coordinate system
         rr.log('origin', rr.Transform3D(translation=[0, 0, 0], axis_length=0.1), static=True)
         
-        # Set up timeseries plots
-        rr.log("plots/gripper_positions", rr.SeriesLines(colors=[255, 0, 0], names="Right Gripper"), static=True)
-        rr.log("plots/gripper_positions", rr.SeriesLines(colors=[0, 0, 255], names="Left Gripper"), static=True)
-        
         # Initialize URDF logger
         self.urdf_logger = URDFLogger(urdf_path, root_path="robot")
         
@@ -76,10 +70,10 @@ class RerunUDPVisualizer:
         # Create UDP socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((self.host, self.port))
+        self.sock.bind(("0.0.0.0", 10000))
         self.sock.settimeout(0.1)  # 100ms timeout for graceful shutdown
         
-        print(f"UDP socket listening on {self.host}:{self.port}")
+        print(f"UDP socket listening on 0.0.0.0:10000")
         print("Waiting for robot joint commands...")
         
     def _parse_message(self, message: dict) -> dict:
@@ -122,11 +116,50 @@ class RerunUDPVisualizer:
             if cmd_key in commands:
                 joint_angles[urdf_joint] = float(commands[cmd_key])
         
-        # Log gripper values if available
-        if "rwristgripper" in commands:
-            rr.log("plots/gripper_positions/Right Gripper", commands["rwristgripper"])
-        if "lwristgripper" in commands:
-            rr.log("plots/gripper_positions/Left Gripper", commands["lwristgripper"])
+        # Define colors for each command (RGB)
+        colors = {
+            # Right arm - red/orange tones
+            "rshoulderpitch": [255, 0, 0],      # Red
+            "rshoulderroll": [255, 128, 0],     # Orange
+            "rshoulderyaw": [255, 200, 0],      # Yellow-orange
+            "relbowpitch": [255, 100, 100],     # Light red
+            "rwristroll": [200, 0, 0],          # Dark red
+            "rgripper": [255, 50, 150],         # Pink
+            
+            # Left arm - blue/cyan tones
+            "lshoulderpitch": [0, 0, 255],      # Blue
+            "lshoulderroll": [0, 128, 255],     # Light blue
+            "lshoulderyaw": [0, 200, 255],      # Cyan
+            "lelbowpitch": [100, 100, 255],     # Light purple-blue
+            "lwristroll": [0, 0, 200],          # Dark blue
+            "lgripper": [150, 50, 255],         # Purple
+            
+            # Velocity - green tones
+            "xvel": [0, 255, 0],                # Green
+            "yvel": [0, 200, 100],              # Teal
+            "zvel": [100, 255, 0],              # Yellow-green
+            "rollvel": [0, 150, 0],             # Dark green
+            "pitchvel": [150, 255, 150],        # Light green
+            "yawvel": [50, 200, 50],            # Medium green
+        }
+        
+        # Log all available commands to plots
+        for cmd_key, value in commands.items():
+            if cmd_key in colors:
+                # Organize plots by category
+                if "shoulder" in cmd_key or "elbow" in cmd_key or "wrist" in cmd_key:
+                    category = "arm_joints"
+                elif "gripper" in cmd_key:
+                    category = "grippers"
+                elif "vel" in cmd_key:
+                    category = "velocity"
+                else:
+                    category = "other"
+                
+                rr.log(
+                    f"plots/{category}/{cmd_key}",
+                    rr.Scalars(np.array([float(value)]))
+                )
             
         return joint_angles
     
@@ -139,7 +172,6 @@ class RerunUDPVisualizer:
             print("\n" + "="*60)
             print("Rerun Visualizer Running")
             print("="*60)
-            print(f"Listening on: {self.host}:{self.port}")
             print("Send UDP commands in JSON format with 'commands' key")
             print("Press Ctrl+C to stop")
             print("="*60 + "\n")
@@ -201,25 +233,16 @@ Examples:
   python visualizer.py --host 192.168.1.100 --port 10000
         """
     )
-    parser.add_argument("--host", type=str, default="0.0.0.0", 
-                        help="UDP host to bind to (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=10002,
-                        help="UDP port to listen on (default: 10002)")
-    parser.add_argument("--urdf", type=str, default=None,
-                        help="Path to URDF file (default: use built-in kbot)")
-    
-    args = parser.parse_args()
+
     
     # Get URDF path
-    if args.urdf:
-        urdf_path = args.urdf
-    else:
-        urdf_path = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
+ 
+    urdf_path = str(ASSETS_DIR / "kbot_legless" / "robot.urdf")
     
     print(f"\n🤖 Using URDF: {urdf_path}\n")
     
     # Create and run visualizer
-    visualizer = RerunUDPVisualizer(urdf_path, host=args.host)
+    visualizer = RerunUDPVisualizer(urdf_path)
     visualizer.run()
 
 
